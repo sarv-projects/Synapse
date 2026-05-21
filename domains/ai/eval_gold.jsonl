@@ -1,0 +1,3 @@
+{"question":"Which tools implement speculative decoding?","expected_type":"Tool","tier":"T2"}
+{"question":"What is new in the AI ecosystem today?","expected_type":"DailySummary","tier":"T1"}
+{"question":"Which organizations published papers on inference optimization this year?","expected_type":"Organization","tier":"T2"}

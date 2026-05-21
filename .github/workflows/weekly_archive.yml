@@ -1,0 +1,62 @@
+name: Weekly Archive
+
+on:
+  schedule:
+    - cron: "0 1 * * 0"
+  workflow_dispatch:
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NEO4J_URI:         ${{ secrets.NEO4J_URI }}
+      NEO4J_USERNAME:    ${{ secrets.NEO4J_USERNAME }}
+      NEO4J_PASSWORD:    ${{ secrets.NEO4J_PASSWORD }}
+      NEO4J_DATABASE:    ${{ secrets.NEO4J_DATABASE }}
+      QDRANT_URL:        ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY:    ${{ secrets.QDRANT_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run full pipeline with embeddings
+        run: uv run python -m ingestion.pipeline.run --domain ai
+
+      - name: Generate changelog snapshot
+        run: |
+          uv run python -c "
+          from ingestion.neo4j.client import Neo4jClient
+          from schema.config import get_settings
+          import asyncio, json, datetime
+          async def snapshot():
+              settings = get_settings()
+              client = Neo4jClient.from_settings(settings)
+              async with client.session() as s:
+                  r = await s.run('MATCH (n) RETURN labels(n)[0] AS label, count(n) AS cnt')
+                  counts = {row['label']: row['cnt'] async for row in r}
+                  r2 = await s.run('MATCH ()-[r]->() RETURN type(r) AS rel, count(r) AS cnt')
+                  edge_counts = {row['rel']: row['cnt'] async for row in r2}
+              await client.close()
+              snapshot = {'timestamp': datetime.datetime.now().isoformat(), 'nodes': counts, 'edges': edge_counts}
+              with open('changelog_snapshot.json', 'w') as f:
+                  json.dump(snapshot, f, indent=2, default=str)
+              print(f'Snapshot: {counts}')
+          asyncio.run(snapshot())
+          "
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-archive-${{ github.run_id }}
+          path: changelog_snapshot.json
+          if-no-files-found: warn

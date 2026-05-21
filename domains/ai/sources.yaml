@@ -1,0 +1,138 @@
+# NEXUS-AI Data Sources Configuration
+# All 9 free-tier sources with entity coverage declarations
+
+sources:
+  - name: arxiv
+    type: rest_xml
+    base_url: https://export.arxiv.org/api/query
+    rate_limit:
+      requests_per_second: 3
+    auth_required: false
+    entity_coverage:
+      - Paper
+      - Author
+    fetch_params:
+      search_query: "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV"
+      max_results: 100
+      sortBy: submittedDate
+      sortOrder: descending
+
+  - name: huggingface_daily_papers
+    type: rss
+    base_url: https://huggingface.co/papers/rss
+    rate_limit:
+      requests_per_hour: 1000
+    auth_required: false
+    entity_coverage:
+      - Paper
+
+  - name: huggingface_trending_models
+    type: rest_json
+    base_url: https://huggingface.co/api/models
+    rate_limit:
+      requests_per_hour: 1000
+    auth_required: false
+    entity_coverage:
+      - Model
+      - Organization
+    fetch_params:
+      sort: likes
+      direction: -1
+      limit: 100
+
+  - name: huggingface_hub
+    type: rest_json
+    base_url: https://huggingface.co/api/models
+    rate_limit:
+      requests_per_hour: 1000
+    auth_required: false
+    entity_coverage:
+      - Model
+      - Organization
+    fetch_params:
+      sort: downloads
+      direction: -1
+      limit: 100
+
+  - name: papers_with_code
+    type: rest_json
+    base_url: https://paperswithcode.com/api/v1/papers/
+    rate_limit:
+      requests_per_minute: 100
+    auth_required: false
+    entity_coverage:
+      - Paper
+      - Technique
+    fetch_params:
+      items_per_page: 50
+
+  - name: github_trending
+    type: rss
+    base_url: https://github.com/trending/python?since=daily&spoken_language_code=en
+    rate_limit:
+      requests_per_hour: 60
+    auth_required: false
+    entity_coverage:
+      - Tool
+
+  - name: github_repo_content
+    type: rest_json
+    base_url: https://api.github.com/search/repositories
+    rate_limit:
+      requests_per_hour_unauth: 60
+      requests_per_hour_auth: 5000
+    auth_required: optional
+    auth_env_var: GITHUB_TOKEN
+    entity_coverage:
+      - Tool
+    fetch_params:
+      q: "topic:machine-learning topic:deep-learning language:python stars:>100"
+      sort: stars
+      order: desc
+      per_page: 50
+
+  - name: semantic_scholar
+    type: rest_json
+    base_url: https://api.semanticscholar.org/graph/v1/paper/search
+    rate_limit:
+      requests_per_minute: 100
+    auth_required: false
+    entity_coverage:
+      - Paper
+      - Author
+    fetch_params:
+      query: "large language model transformer"
+      limit: 50
+      fields: "title,year,authors,abstract,citationCount,externalIds"
+
+  - name: dair_ai_ml_papers
+    type: rss
+    base_url: https://github.com/dair-ai/ML-Papers-of-the-Week/commits/main.atom
+    rate_limit:
+      requests_per_hour: 60
+    auth_required: false
+    entity_coverage:
+      - Paper
+
+# Source priority for conflict resolution
+source_priority:
+  structured_metadata:
+    - arxiv
+    - huggingface_hub
+    - semantic_scholar
+    - papers_with_code
+  
+  implementation_evidence:
+    - github_repo_content  # Code beats marketing
+    - papers_with_code
+    - huggingface_hub
+    - github_trending
+  
+  popularity_signals:
+    - huggingface_trending_models
+    - github_trending
+    - huggingface_daily_papers
+  
+  curation_signals:
+    - dair_ai_ml_papers
+    - huggingface_daily_papers

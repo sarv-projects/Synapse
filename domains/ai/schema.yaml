@@ -1,0 +1,294 @@
+# SYNAPSE-AI Domain Schema v3.0
+# Node types, relationship types, and property specifications
+# Systematic, Networked, Yet Natural, Automated, Provenance-aware Schema Engine
+
+node_types:
+  Paper:
+    properties:
+      arxiv_id: {type: string, required: true, indexed: true}
+      title: {type: string, required: true}
+      abstract_summary: {type: string}
+      published_date: {type: datetime, indexed: true}
+      categories: {type: list}
+      hf_upvotes: {type: integer, default: 0}
+      pwc_tasks: {type: list}
+      has_code: {type: boolean, default: false}
+      code_url: {type: string}
+      embedding: {type: vector, dim: 384}
+    dedup_key: arxiv_id
+
+  Model:
+    properties:
+      hf_model_id: {type: string, required: true, indexed: true}
+      name: {type: string, required: true}
+      org: {type: string, indexed: true}
+      architecture: {type: string}
+      parameter_count: {type: integer}
+      context_length: {type: integer}
+      license: {type: string}
+      hf_downloads: {type: integer, default: 0}
+      hf_likes: {type: integer, default: 0}
+      base_model: {type: string}
+      quantizations: {type: list}
+    dedup_key: hf_model_id
+
+  Tool:
+    properties:
+      name: {type: string, required: true}
+      github_repo: {type: string, required: true, indexed: true}
+      github_stars: {type: integer, default: 0}
+      github_forks: {type: integer, default: 0}
+      pypi_package: {type: string}
+      category: {type: string}
+      language: {type: string}
+      last_commit: {type: datetime}
+      description: {type: string}
+    dedup_key: github_repo
+
+  Technique:
+    properties:
+      canonical_name: {type: string, required: true, indexed: true}
+      category: {type: string}
+      introduced_by: {type: string}
+      description: {type: string}
+      version: {type: string}
+    dedup_key: canonical_name
+
+  TechniqueAlias:
+    properties:
+      name: {type: string, required: true, indexed: true}
+      canonical_id: {type: string, required: true}
+      source: {type: string}
+      first_seen: {type: datetime}
+    dedup_key: name
+
+  Organization:
+    properties:
+      name: {type: string, required: true, indexed: true}
+      type: {type: string}
+      country: {type: string}
+      hf_org_id: {type: string}
+    dedup_key: name
+
+  Author:
+    properties:
+      name: {type: string, required: true}
+      semantic_scholar_id: {type: string, indexed: true}
+      hf_username: {type: string}
+      org: {type: string}
+      paper_count: {type: integer, default: 0}
+      citation_count: {type: integer, default: 0}
+    dedup_key: semantic_scholar_id
+
+  Benchmark:
+    properties:
+      name: {type: string, required: true, indexed: true}
+      task: {type: string}
+      description: {type: string}
+    dedup_key: name
+
+  BenchmarkResult:
+    properties:
+      score: {type: float, required: true}
+      metric: {type: string, required: true}
+      date: {type: datetime}
+    dedup_key: benchmark_model_date
+
+  WebhookSubscription:
+    properties:
+      endpoint_url: {type: string, required: true, indexed: true}
+      event_types: {type: list, required: true}
+      secret_token: {type: string, required: true}
+      active: {type: boolean, default: true}
+      owner_id: {type: string, required: true, indexed: true}
+      created_at: {type: datetime, required: true}
+      last_delivery: {type: datetime}
+    dedup_key: endpoint_url_owner_id
+
+  ApiKey:
+    properties:
+      key_hash: {type: string, required: true, indexed: true}
+      owner_email: {type: string, required: true}
+      created_at: {type: datetime, required: true}
+      last_used: {type: datetime}
+      rate_limit_tier: {type: string, default: standard}
+      usage_count: {type: integer, default: 0}
+    dedup_key: key_hash
+
+  ChangelogEntry:
+    properties:
+      version: {type: string, required: true, indexed: true}
+      date: {type: datetime, required: true}
+      summary: {type: string, required: true}
+      node_delta: {type: integer}
+      edge_delta: {type: integer}
+      breaking_change: {type: boolean, default: false}
+      details: {type: string}
+    dedup_key: version
+
+  EmbeddingIndex:
+    properties:
+      qdrant_id: {type: string, required: true, indexed: true}
+      node_uuid: {type: string, required: true}
+      model_version: {type: string, required: true}
+      dim: {type: integer, required: true}
+      indexed_at: {type: datetime, required: true}
+    dedup_key: qdrant_id
+
+  ModelFamily:
+    properties:
+      canonical_name: {type: string, required: true, indexed: true}
+      org: {type: string}
+      description: {type: string}
+    dedup_key: canonical_name
+
+  Release:
+    properties:
+      version: {type: string, required: true}
+      release_date: {type: datetime, required: true, indexed: true}
+      release_type: {type: string}
+      features_added: {type: list}
+      is_latest: {type: boolean, default: false}
+      deprecated: {type: boolean, default: false}
+    dedup_key: parent_version
+
+relationship_types:
+  AUTHORED_BY:
+    from: Paper
+    to: Author
+    provenance: false
+    trust_level: T1
+
+  PUBLISHED_BY:
+    from: [Paper, Model, Tool]
+    to: Organization
+    provenance: false
+    trust_level: T1
+
+  INTRODUCES:
+    from: Paper
+    to: Technique
+    provenance: true
+    trust_level: T2
+
+  CITES:
+    from: Paper
+    to: Paper
+    provenance: true
+    trust_level: T2
+
+  IMPLEMENTS:
+    from: [Tool, Model]
+    to: Technique
+    provenance: true
+    trust_level: T2_T3
+
+  BASED_ON_PAPER:
+    from: [Tool, Model]
+    to: Paper
+    provenance: true
+    trust_level: T2
+
+  SUPPORTS_MODEL:
+    from: Tool
+    to: Model
+    provenance: true
+    trust_level: T2_T3
+
+  FINE_TUNED_FROM:
+    from: Model
+    to: Model
+    provenance: true
+    trust_level: T2
+
+  BENCHMARKS_ON:
+    from: [Paper, Model]
+    to: Benchmark
+    provenance: false
+    trust_level: T1
+
+  HAS_RESULT:
+    from: [Paper, Model]
+    to: BenchmarkResult
+    provenance: false
+    trust_level: T1
+
+  DEPENDS_ON:
+    from: Tool
+    to: Tool
+    provenance: true
+    trust_level: T1
+
+  SUCCESSOR_OF:
+    from: [Technique, Model]
+    to: [Technique, Model]
+    provenance: true
+    trust_level: T2
+
+  ALIAS_OF:
+    from: TechniqueAlias
+    to: Technique
+    provenance: false
+    trust_level: SYSTEM
+
+  HAS_RELEASE:
+    from: [Tool, Model]
+    to: Release
+    provenance: false
+    trust_level: T1
+
+  ADDS_SUPPORT_FOR:
+    from: Release
+    to: [Technique, Model]
+    provenance: true
+    trust_level: T2
+
+  BELONGS_TO_FAMILY:
+    from: Model
+    to: ModelFamily
+    provenance: false
+    trust_level: SYSTEM
+
+  COLLABORATES_WITH:
+    from: Author
+    to: Author
+    provenance: false
+    trust_level: T1
+
+  DERIVED_SUPPORTS_MODEL:
+    from: Tool
+    to: Model
+    provenance: true
+    trust_level: T3
+
+  SEMANTICALLY_SIMILAR:
+    from: [Paper, Technique]
+    to: [Paper, Technique]
+    provenance: true
+    trust_level: T3
+
+  SUPERSEDES:
+    from: [Technique, Model]
+    to: [Technique, Model]
+    provenance: true
+    trust_level: T2
+
+# Base properties for all nodes
+base_properties:
+  id: {type: uuid, required: true, indexed: true}
+  created_at: {type: datetime, required: true}
+  last_seen: {type: datetime, required: true, indexed: true}
+  status: {type: string, required: true, default: new, indexed: true}  # new, active, archived
+  source: {type: string, required: true}
+  confidence: {type: float, default: 1.0}
+
+# Provenance properties for high-value edges
+provenance_properties:
+  evidence_source: {type: string, required: true}
+  evidence_url: {type: string}
+  evidence_snippet: {type: string}
+  extraction_method: {type: string, required: true}
+  confidence: {type: float, required: true}
+  first_seen: {type: datetime, required: true}
+  last_verified: {type: datetime}
+  verification_status: {type: string, default: unverified}  # unverified, weak, verified, disputed

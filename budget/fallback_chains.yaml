@@ -1,0 +1,51 @@
+# Per-task fallback model chains for v4.0 Budget Controller.
+# When primary model cannot afford the call, try fallbacks in order.
+# Last resort is always local fallback (spaCy / BM25 / rule-based).
+
+decomposition:
+  primary: openai/gpt-oss-20b
+  fallbacks:
+    - openai/gpt-oss-120b
+    - meta-llama/llama-4-scout-17b-16e-instruct
+    - llama-3.1-8b-instant
+
+classification:
+  primary: llama-3.1-8b-instant
+  fallbacks:
+    - meta-llama/llama-4-scout-17b-16e-instruct
+    - local
+
+extraction:
+  primary: llama-3.1-8b-instant
+  fallbacks:
+    - meta-llama/llama-4-scout-17b-16e-instruct
+    - local
+
+analysis:
+  primary: meta-llama/llama-4-scout-17b-16e-instruct
+  fallbacks:
+    - openai/gpt-oss-20b
+    - llama-3.1-8b-instant
+    - qwen-qwq-32b
+    - local
+
+contradiction_detection:
+  primary: meta-llama/llama-4-scout-17b-16e-instruct
+  fallbacks:
+    - openai/gpt-oss-20b
+    - qwen-qwq-32b
+    - llama-3.1-8b-instant
+    - local
+
+synthesis:
+  primary: llama-3.3-70b-versatile
+  fallbacks:
+    - openai/gpt-oss-120b
+    - meta-llama/llama-4-scout-17b-16e-instruct
+    - openai/gpt-oss-20b
+
+critic:
+  primary: openai/gpt-oss-20b
+  fallbacks:
+    - openai/gpt-oss-120b
+    - meta-llama/llama-4-scout-17b-16e-instruct

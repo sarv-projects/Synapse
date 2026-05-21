@@ -1,0 +1,47 @@
+name: Daily Ingest
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 00:00 UTC = 05:30 IST
+  workflow_dispatch:        # manual trigger from GitHub UI
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      NEO4J_URI:         ${{ secrets.NEO4J_URI }}
+      NEO4J_USERNAME:    ${{ secrets.NEO4J_USERNAME }}
+      NEO4J_PASSWORD:    ${{ secrets.NEO4J_PASSWORD }}
+      NEO4J_DATABASE:    ${{ secrets.NEO4J_DATABASE }}
+      GROQ_API_KEYS:     ${{ secrets.GROQ_API_KEYS }}
+      GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+      GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+      POSTGRES_URL:      ${{ secrets.POSTGRES_URL }}
+      QDRANT_URL:        ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY:    ${{ secrets.QDRANT_API_KEY }}
+      DEFAULT_DOMAIN:    ai
+      LOG_LEVEL:         INFO
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run ingestion pipeline
+        run: uv run python -m ingestion.pipeline.run --domain ai
+
+      - name: Upload run log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingest-log-${{ github.run_id }}
+          path: "*.log"
+          if-no-files-found: ignore

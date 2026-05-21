@@ -1,0 +1,29 @@
+# SYNAPSE v4.0 runtime thresholds
+# Loaded at startup by the reasoning engine.
+
+retrieval:
+  confidence_threshold: 0.65   # below this → trigger web research (Node 4)
+
+critic:
+  max_retries: 2                # retry cycles before outputting best available
+  grounding_threshold: 0.8      # minimum grounding score to pass
+  completeness_threshold: 0.8   # minimum completeness score to pass
+  logic_threshold: 0.8          # minimum logic score to pass
+
+budget:
+  rpd_alert_threshold: 0.80    # alert when any model's RPD falls below 20%
+  tpm_alert_threshold: 0.80
+  rpm_alert_threshold: 0.80
+
+latex:
+  compile_timeout: 120          # seconds for xelatex compilation
+  max_retries: 1                # structure check retries before pandoc fallback
+
+web_research:
+  crawl4ai_timeout: 30          # seconds per URL
+  max_parallel_fetches: 5       # max concurrent Crawl4AI fetches
+  session_cache_ttl_days: 7     # cross-session cache TTL
+
+prompt:
+  max_system_tokens: 2000       # max cached system prompt tokens
+  context_trim_percent: 0.25    # trim this fraction of context when over budget

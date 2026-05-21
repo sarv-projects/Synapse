@@ -1,0 +1,98 @@
+# Default LangGraph topology for SYNAPSE v4.0 reasoning pipeline.
+# Loaded dynamically by reasoning/graph/builder.py.
+# Edges marked budget_gate: true are wrapped with pre-execution budget checks.
+
+graph:
+  name: synapse_v4_reasoning
+  version: "4.0.0"
+
+nodes:
+  - id: entry
+    module: reasoning.nodes.entry
+    function: entry_node
+    description: Budget Oracle check + session init
+
+  - id: decomposition
+    module: reasoning.nodes.decomposition
+    function: decomposition_node
+    description: GPT-OSS 20B query decomposition into sub-questions + search plan
+
+  - id: retrieval
+    module: reasoning.nodes.retrieval
+    function: retrieval_node
+    description: LlamaIndex hybrid retrieval (4-tier)
+
+  - id: web_research
+    module: reasoning.subagents.web_research
+    function: web_research_subagent
+    description: DuckDuckGo + Tavily + Crawl4AI (conditional)
+
+  - id: analysis_crew
+    module: reasoning.nodes.analysis_crew
+    function: analysis_crew_node
+    description: Extractor + Analyzer + ContradictionDetector
+
+  - id: synthesis
+    module: reasoning.nodes.synthesis
+    function: synthesis_node
+    description: Llama 3.3 70B synthesis to structured Markdown
+
+  - id: critic
+    module: reasoning.nodes.critic
+    function: critic_node
+    description: GPT-OSS 20B grounding/completeness/logic evaluation
+
+  - id: output
+    module: reasoning.nodes.output
+    function: output_node
+    description: Template assembly, Markdown output
+
+edges:
+  - from: entry
+    to: decomposition
+    budget_gate: true
+
+  - from: decomposition
+    to: retrieval
+    budget_gate: false
+
+  - from: retrieval
+    to: web_research
+    budget_gate: false
+    condition: retrieval_confidence < 0.65
+
+  - from: retrieval
+    to: analysis_crew
+    budget_gate: false
+    condition: retrieval_confidence >= 0.65
+
+  - from: web_research
+    to: analysis_crew
+    budget_gate: false
+
+  - from: analysis_crew
+    to: synthesis
+    budget_gate: true
+
+  - from: synthesis
+    to: critic
+    budget_gate: true
+
+  - from: critic
+    to: output
+    budget_gate: false
+    condition: critic_pass == true
+
+  - from: critic
+    to: analysis_crew
+    budget_gate: false
+    condition: critic_pass == false and retry_count < 2
+
+  - from: critic
+    to: output
+    budget_gate: false
+    condition: critic_pass == false and retry_count >= 2
+
+  - from: output
+    to: __end__
+    budget_gate: false

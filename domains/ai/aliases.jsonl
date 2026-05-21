@@ -1,0 +1,213 @@
+{"raw": "spec decoding", "canonical": "Speculative Decoding", "category": "Inference"}
+{"raw": "speculative sampling", "canonical": "Speculative Decoding", "category": "Inference"}
+{"raw": "spec sampling", "canonical": "Speculative Decoding", "category": "Inference"}
+{"raw": "flash attention", "canonical": "FlashAttention-2", "category": "Architecture"}
+{"raw": "flash-attention", "canonical": "FlashAttention-2", "category": "Architecture"}
+{"raw": "fa2", "canonical": "FlashAttention-2", "category": "Architecture"}
+{"raw": "moe", "canonical": "Mixture of Experts", "category": "Architecture"}
+{"raw": "mixture-of-experts", "canonical": "Mixture of Experts", "category": "Architecture"}
+{"raw": "rlhf", "canonical": "Reinforcement Learning from Human Feedback", "category": "Alignment"}
+{"raw": "rlaif", "canonical": "Reinforcement Learning from AI Feedback", "category": "Alignment"}
+{"raw": "lora", "canonical": "Low-Rank Adaptation", "category": "Training"}
+{"raw": "low rank adaptation", "canonical": "Low-Rank Adaptation", "category": "Training"}
+{"raw": "rag", "canonical": "Retrieval-Augmented Generation", "category": "Retrieval"}
+{"raw": "retrieval augmented", "canonical": "Retrieval-Augmented Generation", "category": "Retrieval"}
+{"raw": "kv cache", "canonical": "Key-Value Cache", "category": "Inference"}
+{"raw": "key value caching", "canonical": "Key-Value Cache", "category": "Inference"}
+{"raw": "cot", "canonical": "Chain-of-Thought", "category": "Reasoning"}
+{"raw": "chain of thought", "canonical": "Chain-of-Thought", "category": "Reasoning"}
+{"raw": "llama-3", "canonical": "Llama 3", "category": "Model"}
+{"raw": "meta llama 3", "canonical": "Llama 3", "category": "Model"}
+{"raw": "llama3", "canonical": "Llama 3", "category": "Model"}
+{"raw": "llama-3.1", "canonical": "Llama 3.1", "category": "Model"}
+{"raw": "llama 3.1", "canonical": "Llama 3.1", "category": "Model"}
+{"raw": "llama-3.3", "canonical": "Llama 3.3", "category": "Model"}
+{"raw": "gpt-4", "canonical": "GPT-4", "category": "Model"}
+{"raw": "gpt4", "canonical": "GPT-4", "category": "Model"}
+{"raw": "claude-3", "canonical": "Claude 3", "category": "Model"}
+{"raw": "claude 3", "canonical": "Claude 3", "category": "Model"}
+{"raw": "gemini", "canonical": "Gemini", "category": "Model"}
+{"raw": "gemini-pro", "canonical": "Gemini Pro", "category": "Model"}
+{"raw": "mistral", "canonical": "Mistral", "category": "Model"}
+{"raw": "mixtral", "canonical": "Mixtral", "category": "Model"}
+{"raw": "quantization", "canonical": "Quantization", "category": "Optimization"}
+{"raw": "int8", "canonical": "INT8 Quantization", "category": "Optimization"}
+{"raw": "int4", "canonical": "INT4 Quantization", "category": "Optimization"}
+{"raw": "gguf", "canonical": "GGUF", "category": "Format"}
+{"raw": "ggml", "canonical": "GGML", "category": "Format"}
+{"raw": "awq", "canonical": "AWQ", "category": "Quantization"}
+{"raw": "gptq", "canonical": "GPTQ", "category": "Quantization"}
+{"raw": "qlora", "canonical": "QLoRA", "category": "Training"}
+{"raw": "peft", "canonical": "Parameter-Efficient Fine-Tuning", "category": "Training"}
+{"raw": "parameter efficient", "canonical": "Parameter-Efficient Fine-Tuning", "category": "Training"}
+{"raw": "dpo", "canonical": "Direct Preference Optimization", "category": "Alignment"}
+{"raw": "direct preference", "canonical": "Direct Preference Optimization", "category": "Alignment"}
+{"raw": "ppo", "canonical": "Proximal Policy Optimization", "category": "Alignment"}
+{"raw": "proximal policy", "canonical": "Proximal Policy Optimization", "category": "Alignment"}
+{"raw": "sft", "canonical": "Supervised Fine-Tuning", "category": "Training"}
+{"raw": "supervised fine tuning", "canonical": "Supervised Fine-Tuning", "category": "Training"}
+{"raw": "instruction tuning", "canonical": "Instruction Tuning", "category": "Training"}
+{"raw": "instruction-tuning", "canonical": "Instruction Tuning", "category": "Training"}
+{"raw": "few-shot", "canonical": "Few-Shot Learning", "category": "Learning"}
+{"raw": "few shot", "canonical": "Few-Shot Learning", "category": "Learning"}
+{"raw": "zero-shot", "canonical": "Zero-Shot Learning", "category": "Learning"}
+{"raw": "zero shot", "canonical": "Zero-Shot Learning", "category": "Learning"}
+{"raw": "in-context learning", "canonical": "In-Context Learning", "category": "Learning"}
+{"raw": "in context learning", "canonical": "In-Context Learning", "category": "Learning"}
+{"raw": "icl", "canonical": "In-Context Learning", "category": "Learning"}
+{"raw": "transformer", "canonical": "Transformer", "category": "Architecture"}
+{"raw": "attention mechanism", "canonical": "Attention Mechanism", "category": "Architecture"}
+{"raw": "self-attention", "canonical": "Self-Attention", "category": "Architecture"}
+{"raw": "self attention", "canonical": "Self-Attention", "category": "Architecture"}
+{"raw": "multi-head attention", "canonical": "Multi-Head Attention", "category": "Architecture"}
+{"raw": "multi head attention", "canonical": "Multi-Head Attention", "category": "Architecture"}
+{"raw": "grouped query attention", "canonical": "Grouped Query Attention", "category": "Architecture"}
+{"raw": "gqa", "canonical": "Grouped Query Attention", "category": "Architecture"}
+{"raw": "sliding window attention", "canonical": "Sliding Window Attention", "category": "Architecture"}
+{"raw": "rotary embeddings", "canonical": "Rotary Position Embeddings", "category": "Architecture"}
+{"raw": "rope", "canonical": "Rotary Position Embeddings", "category": "Architecture"}
+{"raw": "alibi", "canonical": "ALiBi", "category": "Architecture"}
+{"raw": "positional encoding", "canonical": "Positional Encoding", "category": "Architecture"}
+{"raw": "beam search", "canonical": "Beam Search", "category": "Decoding"}
+{"raw": "nucleus sampling", "canonical": "Nucleus Sampling", "category": "Decoding"}
+{"raw": "top-p", "canonical": "Nucleus Sampling", "category": "Decoding"}
+{"raw": "top-k", "canonical": "Top-K Sampling", "category": "Decoding"}
+{"raw": "temperature sampling", "canonical": "Temperature Sampling", "category": "Decoding"}
+{"raw": "greedy decoding", "canonical": "Greedy Decoding", "category": "Decoding"}
+{"raw": "contrastive search", "canonical": "Contrastive Search", "category": "Decoding"}
+{"raw": "model merging", "canonical": "Model Merging", "category": "Optimization"}
+{"raw": "model fusion", "canonical": "Model Merging", "category": "Optimization"}
+{"raw": "distillation", "canonical": "Knowledge Distillation", "category": "Optimization"}
+{"raw": "knowledge distillation", "canonical": "Knowledge Distillation", "category": "Optimization"}
+{"raw": "pruning", "canonical": "Model Pruning", "category": "Optimization"}
+{"raw": "model pruning", "canonical": "Model Pruning", "category": "Optimization"}
+{"raw": "sparse attention", "canonical": "Sparse Attention", "category": "Architecture"}
+{"raw": "linear attention", "canonical": "Linear Attention", "category": "Architecture"}
+{"raw": "efficient attention", "canonical": "Efficient Attention", "category": "Architecture"}
+{"raw": "cross-attention", "canonical": "Cross-Attention", "category": "Architecture"}
+{"raw": "cross attention", "canonical": "Cross-Attention", "category": "Architecture"}
+{"raw": "encoder-decoder", "canonical": "Encoder-Decoder", "category": "Architecture"}
+{"raw": "encoder decoder", "canonical": "Encoder-Decoder", "category": "Architecture"}
+{"raw": "decoder-only", "canonical": "Decoder-Only", "category": "Architecture"}
+{"raw": "decoder only", "canonical": "Decoder-Only", "category": "Architecture"}
+{"raw": "prefix tuning", "canonical": "Prefix Tuning", "category": "Training"}
+{"raw": "prompt tuning", "canonical": "Prompt Tuning", "category": "Training"}
+{"raw": "adapter", "canonical": "Adapter Layers", "category": "Training"}
+{"raw": "adapter layers", "canonical": "Adapter Layers", "category": "Training"}
+{"raw": "bitfit", "canonical": "BitFit", "category": "Training"}
+{"raw": "ia3", "canonical": "IA3", "category": "Training"}
+{"raw": "soft prompts", "canonical": "Soft Prompts", "category": "Prompting"}
+{"raw": "hard prompts", "canonical": "Hard Prompts", "category": "Prompting"}
+{"raw": "prompt engineering", "canonical": "Prompt Engineering", "category": "Prompting"}
+{"raw": "prompt design", "canonical": "Prompt Engineering", "category": "Prompting"}
+{"raw": "constitutional ai", "canonical": "Constitutional AI", "category": "Alignment"}
+{"raw": "cai", "canonical": "Constitutional AI", "category": "Alignment"}
+{"raw": "red teaming", "canonical": "Red Teaming", "category": "Safety"}
+{"raw": "adversarial testing", "canonical": "Red Teaming", "category": "Safety"}
+{"raw": "jailbreak", "canonical": "Jailbreak", "category": "Safety"}
+{"raw": "jailbreaking", "canonical": "Jailbreak", "category": "Safety"}
+{"raw": "safety fine-tuning", "canonical": "Safety Fine-Tuning", "category": "Safety"}
+{"raw": "toxicity detection", "canonical": "Toxicity Detection", "category": "Safety"}
+{"raw": "bias mitigation", "canonical": "Bias Mitigation", "category": "Fairness"}
+{"raw": "fairness", "canonical": "Fairness", "category": "Fairness"}
+{"raw": "interpretability", "canonical": "Interpretability", "category": "Explainability"}
+{"raw": "explainability", "canonical": "Explainability", "category": "Explainability"}
+{"raw": "mechanistic interpretability", "canonical": "Mechanistic Interpretability", "category": "Explainability"}
+{"raw": "activation patching", "canonical": "Activation Patching", "category": "Explainability"}
+{"raw": "probing", "canonical": "Probing", "category": "Analysis"}
+{"raw": "linear probing", "canonical": "Linear Probing", "category": "Analysis"}
+{"raw": "embedding analysis", "canonical": "Embedding Analysis", "category": "Analysis"}
+{"raw": "attention visualization", "canonical": "Attention Visualization", "category": "Analysis"}
+{"raw": "gradient-based attribution", "canonical": "Gradient-Based Attribution", "category": "Explainability"}
+{"raw": "saliency maps", "canonical": "Saliency Maps", "category": "Explainability"}
+{"raw": "integrated gradients", "canonical": "Integrated Gradients", "category": "Explainability"}
+{"raw": "shap", "canonical": "SHAP", "category": "Explainability"}
+{"raw": "lime", "canonical": "LIME", "category": "Explainability"}
+{"raw": "counterfactual", "canonical": "Counterfactual Explanations", "category": "Explainability"}
+{"raw": "counterfactual explanations", "canonical": "Counterfactual Explanations", "category": "Explainability"}
+{"raw": "data augmentation", "canonical": "Data Augmentation", "category": "Training"}
+{"raw": "back-translation", "canonical": "Back-Translation", "category": "Data"}
+{"raw": "back translation", "canonical": "Back-Translation", "category": "Data"}
+{"raw": "synthetic data", "canonical": "Synthetic Data Generation", "category": "Data"}
+{"raw": "synthetic data generation", "canonical": "Synthetic Data Generation", "category": "Data"}
+{"raw": "self-instruct", "canonical": "Self-Instruct", "category": "Data"}
+{"raw": "self instruct", "canonical": "Self-Instruct", "category": "Data"}
+{"raw": "evol-instruct", "canonical": "Evol-Instruct", "category": "Data"}
+{"raw": "evol instruct", "canonical": "Evol-Instruct", "category": "Data"}
+{"raw": "curriculum learning", "canonical": "Curriculum Learning", "category": "Training"}
+{"raw": "continual learning", "canonical": "Continual Learning", "category": "Learning"}
+{"raw": "lifelong learning", "canonical": "Continual Learning", "category": "Learning"}
+{"raw": "catastrophic forgetting", "canonical": "Catastrophic Forgetting", "category": "Learning"}
+{"raw": "elastic weight consolidation", "canonical": "Elastic Weight Consolidation", "category": "Learning"}
+{"raw": "ewc", "canonical": "Elastic Weight Consolidation", "category": "Learning"}
+{"raw": "replay buffer", "canonical": "Replay Buffer", "category": "Learning"}
+{"raw": "experience replay", "canonical": "Experience Replay", "category": "Learning"}
+{"raw": "meta-learning", "canonical": "Meta-Learning", "category": "Learning"}
+{"raw": "meta learning", "canonical": "Meta-Learning", "category": "Learning"}
+{"raw": "maml", "canonical": "MAML", "category": "Meta-Learning"}
+{"raw": "model-agnostic meta-learning", "canonical": "MAML", "category": "Meta-Learning"}
+{"raw": "transfer learning", "canonical": "Transfer Learning", "category": "Learning"}
+{"raw": "domain adaptation", "canonical": "Domain Adaptation", "category": "Learning"}
+{"raw": "multi-task learning", "canonical": "Multi-Task Learning", "category": "Learning"}
+{"raw": "multi task learning", "canonical": "Multi-Task Learning", "category": "Learning"}
+{"raw": "multitask", "canonical": "Multi-Task Learning", "category": "Learning"}
+{"raw": "active learning", "canonical": "Active Learning", "category": "Learning"}
+{"raw": "semi-supervised", "canonical": "Semi-Supervised Learning", "category": "Learning"}
+{"raw": "semi supervised", "canonical": "Semi-Supervised Learning", "category": "Learning"}
+{"raw": "self-supervised", "canonical": "Self-Supervised Learning", "category": "Learning"}
+{"raw": "self supervised", "canonical": "Self-Supervised Learning", "category": "Learning"}
+{"raw": "contrastive learning", "canonical": "Contrastive Learning", "category": "Learning"}
+{"raw": "simclr", "canonical": "SimCLR", "category": "Contrastive"}
+{"raw": "moco", "canonical": "MoCo", "category": "Contrastive"}
+{"raw": "byol", "canonical": "BYOL", "category": "Self-Supervised"}
+{"raw": "simsiam", "canonical": "SimSiam", "category": "Self-Supervised"}
+{"raw": "masked language modeling", "canonical": "Masked Language Modeling", "category": "Pretraining"}
+{"raw": "mlm", "canonical": "Masked Language Modeling", "category": "Pretraining"}
+{"raw": "causal language modeling", "canonical": "Causal Language Modeling", "category": "Pretraining"}
+{"raw": "clm", "canonical": "Causal Language Modeling", "category": "Pretraining"}
+{"raw": "next token prediction", "canonical": "Next Token Prediction", "category": "Pretraining"}
+{"raw": "autoregressive", "canonical": "Autoregressive", "category": "Architecture"}
+{"raw": "autoencoder", "canonical": "Autoencoder", "category": "Architecture"}
+{"raw": "vae", "canonical": "Variational Autoencoder", "category": "Architecture"}
+{"raw": "variational autoencoder", "canonical": "Variational Autoencoder", "category": "Architecture"}
+{"raw": "gan", "canonical": "Generative Adversarial Network", "category": "Architecture"}
+{"raw": "generative adversarial network", "canonical": "Generative Adversarial Network", "category": "Architecture"}
+{"raw": "diffusion", "canonical": "Diffusion Models", "category": "Generative"}
+{"raw": "diffusion models", "canonical": "Diffusion Models", "category": "Generative"}
+{"raw": "ddpm", "canonical": "DDPM", "category": "Diffusion"}
+{"raw": "ddim", "canonical": "DDIM", "category": "Diffusion"}
+{"raw": "stable diffusion", "canonical": "Stable Diffusion", "category": "Model"}
+{"raw": "latent diffusion", "canonical": "Latent Diffusion", "category": "Diffusion"}
+{"raw": "score matching", "canonical": "Score Matching", "category": "Diffusion"}
+{"raw": "flow matching", "canonical": "Flow Matching", "category": "Generative"}
+{"raw": "normalizing flows", "canonical": "Normalizing Flows", "category": "Generative"}
+{"raw": "energy-based models", "canonical": "Energy-Based Models", "category": "Generative"}
+{"raw": "ebm", "canonical": "Energy-Based Models", "category": "Generative"}
+{"raw": "multimodal", "canonical": "Multimodal Learning", "category": "Learning"}
+{"raw": "multimodal learning", "canonical": "Multimodal Learning", "category": "Learning"}
+{"raw": "vision-language", "canonical": "Vision-Language Models", "category": "Multimodal"}
+{"raw": "vision language", "canonical": "Vision-Language Models", "category": "Multimodal"}
+{"raw": "vlm", "canonical": "Vision-Language Models", "category": "Multimodal"}
+{"raw": "clip", "canonical": "CLIP", "category": "Model"}
+{"raw": "blip", "canonical": "BLIP", "category": "Model"}
+{"raw": "flamingo", "canonical": "Flamingo", "category": "Model"}
+{"raw": "llava", "canonical": "LLaVA", "category": "Model"}
+{"raw": "gpt-4v", "canonical": "GPT-4V", "category": "Model"}
+{"raw": "gpt4v", "canonical": "GPT-4V", "category": "Model"}
+{"raw": "image captioning", "canonical": "Image Captioning", "category": "Task"}
+{"raw": "visual question answering", "canonical": "Visual Question Answering", "category": "Task"}
+{"raw": "vqa", "canonical": "Visual Question Answering", "category": "Task"}
+{"raw": "text-to-image", "canonical": "Text-to-Image", "category": "Task"}
+{"raw": "text to image", "canonical": "Text-to-Image", "category": "Task"}
+{"raw": "image-to-text", "canonical": "Image-to-Text", "category": "Task"}
+{"raw": "image to text", "canonical": "Image-to-Text", "category": "Task"}
+{"raw": "text-to-speech", "canonical": "Text-to-Speech", "category": "Task"}
+{"raw": "tts", "canonical": "Text-to-Speech", "category": "Task"}
+{"raw": "speech-to-text", "canonical": "Speech-to-Text", "category": "Task"}
+{"raw": "stt", "canonical": "Speech-to-Text", "category": "Task"}
+{"raw": "asr", "canonical": "Automatic Speech Recognition", "category": "Task"}
+{"raw": "automatic speech recognition", "canonical": "Automatic Speech Recognition", "category": "Task"}
+{"raw": "speech recognition", "canonical": "Automatic Speech Recognition", "category": "Task"}
+{"raw": "whisper", "canonical": "Whisper", "category": "Model"}
+{"raw": "wav2vec", "canonical": "Wav2Vec", "category": "Model"}
+{"raw": "hubert", "canonical": "HuBERT", "category": "Model"}
