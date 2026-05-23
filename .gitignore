@@ -53,3 +53,6 @@ review_queue.db
 # Logs
 *.log
 logs/
+.codex
+SYNAPSE_v4_SPEC.md
+.gitignore
