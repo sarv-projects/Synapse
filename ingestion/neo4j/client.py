@@ -28,3 +28,21 @@ class Neo4jClient:
 
     async def close(self) -> None:
         await self._driver.close()
+
+
+_neo4j_client: Neo4jClient | None = None
+
+
+def get_neo4j_client() -> Neo4jClient:
+    global _neo4j_client
+    if _neo4j_client is None:
+        from schema.config import get_settings
+        _neo4j_client = Neo4jClient.from_settings(get_settings())
+    return _neo4j_client
+
+
+async def close_neo4j_client() -> None:
+    global _neo4j_client
+    if _neo4j_client is not None:
+        await _neo4j_client.close()
+        _neo4j_client = None

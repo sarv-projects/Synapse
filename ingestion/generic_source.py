@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import xml.etree.ElementTree as ET
 import feedparser
 
-from ingestion.sources.base import SourceDocument
+from ingestion.sources.base import SourceDocument, SourceFetcher, SourceManifest
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class SourceConfig:
         return getattr(self, key, default)
 
 
-class GenericSourceFetcher:
+class GenericSourceFetcher(SourceFetcher):
     """Universal fetcher that works with any configured source."""
 
     def __init__(self, config):
@@ -55,6 +55,17 @@ class GenericSourceFetcher:
             self.config = config
 
         self.source_name = self.config.name
+        
+        # Build manifest before calling super().__init__()
+        self.manifest = SourceManifest(
+            name=self.config.name,
+            source_type=self.config.type,
+            base_url=self.config.base_url,
+            rate_limit=self.config.rate_limit,
+            entity_coverage=self.config.entity_coverage,
+            auth_required=self.config.auth_required,
+        )
+        super().__init__()
         import os
         headers = dict(self.config.headers or {})
         if self.config.auth_env_var:

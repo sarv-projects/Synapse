@@ -23,3 +23,14 @@ class EmbeddingGenerator:
     def generate_query_embedding(self, query: str) -> List[float]:
         """Generate embedding for search query."""
         return self.model.encode(query).tolist()
+
+
+_generator = None
+
+
+def get_embedding_generator() -> EmbeddingGenerator:
+    global _generator
+    if _generator is None:
+        _generator = EmbeddingGenerator()
+    return _generator
+

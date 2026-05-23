@@ -82,9 +82,9 @@ def _gate4_source_credibility(source_type: str, metrics: dict, url: str) -> bool
 async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
     """Gate 5: Qdrant semantic dedup — cosine ≥ 0.92 means duplicate."""
     try:
-        from embedding.generator import EmbeddingGenerator
+        from embedding.generator import get_embedding_generator
         from embedding.qdrant_client import get_qdrant_client
-        gen = EmbeddingGenerator()
+        gen = get_embedding_generator()
         vector = gen.generate_entity_embedding(title, content[:512])
         qdrant = get_qdrant_client()
         results = qdrant.search_similar(vector, limit=1, score_threshold=0.92)

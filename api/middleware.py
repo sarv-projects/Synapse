@@ -21,6 +21,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.rpm = requests_per_minute
         self.clients: dict[str, list[float]] = defaultdict(list)
+        self.last_pruned = time.time()
 
     async def dispatch(self, request: Request, call_next: Callable):
         # Never rate-limit health or docs
@@ -32,6 +33,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Slide the window
         self.clients[client_ip] = [t for t in self.clients[client_ip] if now - t < 60]
+
+        # Periodically prune expired clients to prevent memory leak
+        if now - self.last_pruned > 300:
+            self.last_pruned = now
+            expired_ips = [ip for ip, reqs in self.clients.items() if not reqs]
+            for ip in expired_ips:
+                del self.clients[ip]
 
         if len(self.clients[client_ip]) >= self.rpm:
             logger.warning(f"Rate limit exceeded for {client_ip}")
@@ -49,10 +57,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable):
         response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        settings = get_settings()
+        response.headers["X-Content-Type-Options"] = settings.x_content_type_options
+        response.headers["X-Frame-Options"] = settings.x_frame_options
+        response.headers["X-XSS-Protection"] = settings.x_xss_protection
+        response.headers["Referrer-Policy"] = settings.referrer_policy
         return response
 
 

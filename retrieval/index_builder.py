@@ -61,13 +61,14 @@ class HybridRetrievalEngine:
 
     async def _init_fallback(self):
         """Fallback to hand-rolled retrieval when LlamaIndex unavailable."""
-        from retrieval.query_engines import query_vector, query_bm25, query_graph
+        from retrieval.query_engines import query_vector, query_bm25, query_graph, query_hybrid
         self._query_engines = {
             "vector": query_vector,
             "bm25": query_bm25,
             "kg": query_graph,
+            "hybrid": query_hybrid,
         }
-        logger.info("Fallback retrieval engines initialized (vector + BM25 + KG)")
+        logger.info("Fallback retrieval engines initialized (vector + BM25 + KG + Hybrid)")
 
     async def query(self, question: str, strategy: str = "hybrid", limit: int = 10) -> list[dict]:
         """Execute a retrieval query using the configured strategy."""
@@ -86,14 +87,24 @@ class HybridRetrievalEngine:
                 logger.warning(f"LlamaIndex query failed: {e}")
 
         # Fallback path
-        if strategy == "vector" or strategy == "hybrid":
+        if strategy == "hybrid":
+            hybrid_func = self._query_engines.get("hybrid")
+            if hybrid_func:
+                return await hybrid_func(question, limit=limit)
+        elif strategy == "vector":
             vec_func = self._query_engines.get("vector")
             if vec_func:
                 return await vec_func(question, limit=limit)
-        if strategy == "bm25":
+        elif strategy == "bm25":
             bm25_func = self._query_engines.get("bm25")
             if bm25_func:
                 return await bm25_func(question, limit=limit)
+        elif strategy in ("graph", "kg"):
+            kg_func = self._query_engines.get("kg")
+            if kg_func:
+                return await kg_func(question)
+        
+        logger.warning(f"Unrecognized or unsupported fallback retrieval strategy: {strategy}")
         return []
 
 

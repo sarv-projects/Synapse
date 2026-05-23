@@ -19,6 +19,13 @@ class ReasonRequest(BaseModel):
     format: str = "markdown"
 
 
+class WebhookSubscriptionRequest(BaseModel):
+    endpoint_url: str
+    event_types: list[str] = ["reason.complete"]
+    secret_token: str = ""
+    owner_id: str = "anonymous"
+
+
 # In-memory job store (DynamoDB in production)
 _jobs: dict[str, dict] = {}
 
@@ -244,7 +251,7 @@ async def get_budget():
 
 
 @reasoning_router.post("/webhook/subscribe")
-async def webhook_subscribe(body: dict):
+async def webhook_subscribe(req: WebhookSubscriptionRequest):
     """Subscribe to webhook events including reason.complete."""
     from webhook.registry import get_webhook_registry
     from webhook.registry import WebhookSubscription
@@ -252,11 +259,11 @@ async def webhook_subscribe(body: dict):
     try:
         registry = get_webhook_registry()
         sub = WebhookSubscription(
-            endpoint_url=body["endpoint_url"],
-            event_types=body.get("event_types", ["reason.complete"]),
-            secret_token=body.get("secret_token", ""),
+            endpoint_url=req.endpoint_url,
+            event_types=req.event_types,
+            secret_token=req.secret_token,
             active=True,
-            owner_id=body.get("owner_id", "anonymous"),
+            owner_id=req.owner_id,
         )
         sub_id = registry.register(sub)
         return {"subscription_id": sub_id, "status": "active"}

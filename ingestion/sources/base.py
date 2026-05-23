@@ -33,6 +33,14 @@ class SourceFetcher(ABC):
 
     manifest: SourceManifest
 
+    def __init__(self) -> None:
+        if not hasattr(self, "manifest") or self.manifest is None:
+            raise AttributeError(f"{self.__class__.__name__} must define a 'manifest' attribute.")
+        if not isinstance(self.manifest, SourceManifest):
+            raise TypeError(f"{self.__class__.__name__}.manifest must be an instance of SourceManifest.")
+        if not self.manifest.name:
+            raise ValueError(f"{self.__class__.__name__}.manifest.name cannot be empty.")
+
     @abstractmethod
     async def fetch(self) -> list[SourceDocument]:
         """Fetch documents from the source."""

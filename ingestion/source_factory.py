@@ -3,6 +3,7 @@ import yaml
 from typing import List, Dict, Any
 import os
 
+from ingestion.sources.base import SourceFetcher
 from ingestion.generic_source import GenericSourceFetcher
 from ingestion.circuit_breaker_wrapper import get_all_circuit_states
 
@@ -16,7 +17,12 @@ class SourceFactory:
         
         self.config_path = config_path
         self.sources_config = self._load_sources_config()
-        self.active_fetchers: Dict[str, GenericSourceFetcher] = {}
+        self.active_fetchers: Dict[str, SourceFetcher] = {}
+        self._registry: Dict[str, type[SourceFetcher]] = {}
+        
+    def register_fetcher_class(self, type_name: str, fetcher_cls: type[SourceFetcher]) -> None:
+        """Register a custom fetcher class for a specific source type."""
+        self._registry[type_name] = fetcher_cls
     
     def _load_sources_config(self) -> Dict[str, Any]:
         """Load sources configuration from YAML file."""
@@ -27,14 +33,25 @@ class SourceFactory:
         except Exception as e:
             raise RuntimeError(f"Failed to load sources config from {self.config_path}: {e}")
     
-    def create_fetcher(self, source_name: str) -> GenericSourceFetcher:
+    def create_fetcher(self, source_name: str) -> SourceFetcher:
         """Create a fetcher for a specific source."""
         if source_name not in self.active_fetchers:
             source_config = self._get_source_config(source_name)
             if not source_config:
                 raise ValueError(f"Source '{source_name}' not found in configuration")
             
-            self.active_fetchers[source_name] = GenericSourceFetcher(source_config)
+            source_type = source_config.get("type", "rest_json")
+            if source_type in self._registry:
+                fetcher_cls = self._registry[source_type]
+                try:
+                    fetcher = fetcher_cls(source_config)
+                except TypeError:
+                    fetcher = fetcher_cls()
+                    if hasattr(fetcher, "configure"):
+                        getattr(fetcher, "configure")(source_config)
+                self.active_fetchers[source_name] = fetcher
+            else:
+                self.active_fetchers[source_name] = GenericSourceFetcher(source_config)
         
         return self.active_fetchers[source_name]
     
@@ -51,7 +68,7 @@ class SourceFactory:
         sources = self.sources_config.get("sources", [])
         return [source.get("name") for source in sources if source.get("name")]
     
-    def create_all_fetchers(self) -> Dict[str, GenericSourceFetcher]:
+    def create_all_fetchers(self) -> Dict[str, SourceFetcher]:
         """Create fetchers for all configured sources."""
         fetchers = {}
         for source_name in self.get_all_source_names():
@@ -91,10 +108,14 @@ def get_source_factory() -> SourceFactory:
         _source_factory = SourceFactory()
     return _source_factory
 
-def create_fetcher(source_name: str) -> GenericSourceFetcher:
+def create_fetcher(source_name: str) -> SourceFetcher:
     """Convenience function to create a fetcher."""
     return get_source_factory().create_fetcher(source_name)
 
-def create_all_fetchers() -> Dict[str, GenericSourceFetcher]:
+def create_all_fetchers() -> Dict[str, SourceFetcher]:
     """Convenience function to create all fetchers."""
     return get_source_factory().create_all_fetchers()
+
+def register_fetcher_class(type_name: str, fetcher_cls: type[SourceFetcher]) -> None:
+    """Convenience function to register a custom fetcher class globally."""
+    get_source_factory().register_fetcher_class(type_name, fetcher_cls)

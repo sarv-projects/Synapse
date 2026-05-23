@@ -40,12 +40,18 @@ class GraphBuilder:
         self._node_modules[cache_key] = func
         return func
 
-    def _wrap_with_budget_gate(self, func, task_type: str, model_id: str):
+    def _wrap_with_budget_gate(self, func, task_type: str, model_id: str, estimated_tokens: int = 500):
         """Wrap a node function with budget gate check."""
         async def wrapped(state: ReasoningState) -> ReasoningState:
             from budget.oracle import get_budget_oracle
             oracle = get_budget_oracle()
-            estimated = 500  # conservative estimate
+            
+            # Dynamically adjust conservative estimate based on query factor
+            estimated = estimated_tokens
+            if hasattr(state, "query") and state.query:
+                query_factor = min(2.0, max(0.5, len(state.query) / 300.0))
+                estimated = int(estimated * query_factor)
+
             allowed, _ = await oracle.gate(model_id, estimated)
             if not allowed:
                 state.status = "FAILED"
@@ -65,6 +71,37 @@ class GraphBuilder:
             func = self._resolve_node_func(
                 node_def["id"], node_def["module"], node_def["function"]
             )
+            
+            # Check if any incoming edge pointing to this node has budget_gate = True
+            is_budget_gated = False
+            for edge in self.topology.get("edges", []):
+                if edge["to"] == node_def["id"] and edge.get("budget_gate") is True:
+                    is_budget_gated = True
+                    break
+            
+            if is_budget_gated:
+                node_id = node_def["id"]
+                if node_id == "decomposition":
+                    model_id = "openai/gpt-oss-20b"
+                    task_type = "decomposition"
+                    default_estimate = 800
+                elif node_id == "synthesis":
+                    model_id = "llama-3.3-70b-versatile"
+                    task_type = "synthesis"
+                    default_estimate = 1500
+                elif node_id == "critic":
+                    model_id = "openai/gpt-oss-20b"
+                    task_type = "critic"
+                    default_estimate = 1000
+                else:
+                    model_id = "llama-3.3-70b-versatile"
+                    task_type = "default"
+                    default_estimate = 500
+                
+                estimated_tokens = node_def.get("estimated_tokens", default_estimate)
+                func = self._wrap_with_budget_gate(func, task_type, model_id, estimated_tokens)
+                logger.info(f"Wrapped node {node_id} with budget gate (model: {model_id}, task: {task_type}, estimate: {estimated_tokens})")
+
             graph.add_node(node_def["id"], func)
             logger.debug(f"Added node: {node_def['id']}")
 
@@ -93,8 +130,10 @@ class GraphBuilder:
                     route_map,
                 )
 
-        # Set entry point
-        entry_id = self.topology["nodes"][0]["id"]
+        # Set entry point dynamically
+        entry_id = self.topology.get("graph", {}).get("entry_point") or self.topology.get("entry_point")
+        if not entry_id:
+            entry_id = self.topology["nodes"][0]["id"]
         graph.set_entry_point(entry_id)
 
         compiled = graph.compile()

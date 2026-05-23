@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, UTC
 import uuid
 
-from embedding.generator import EmbeddingGenerator
+from embedding.generator import get_embedding_generator
 from embedding.qdrant_client import get_qdrant_client
 from ingestion.neo4j.client import Neo4jClient
 from schema.config import get_settings
@@ -16,7 +16,7 @@ class EmbeddingPipeline:
     """Pipeline for generating and storing embeddings for nodes."""
     
     def __init__(self):
-        self.embedding_generator = EmbeddingGenerator()
+        self.embedding_generator = get_embedding_generator()
         self.qdrant_client = get_qdrant_client()
         self.settings = get_settings()
         self.neo4j_client = None  # Will be initialized when needed

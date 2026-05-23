@@ -30,6 +30,10 @@ class Settings(BaseModel):
     synapse_admin_key: str = Field(default="change-me")
     api_version: str = Field(default="v1")
     cors_origins: list[str] = Field(default=["http://localhost:5173"])
+    x_content_type_options: str = Field(default="nosniff")
+    x_frame_options: str = Field(default="SAMEORIGIN")
+    x_xss_protection: str = Field(default="1; mode=block")
+    referrer_policy: str = Field(default="strict-origin-when-cross-origin")
     
     # System
     log_level: str = Field(default="INFO")
@@ -68,6 +72,10 @@ class Settings(BaseModel):
             synapse_admin_key=os.getenv("SYNAPSE_ADMIN_KEY", "change-me"),
             api_version=os.getenv("API_VERSION", "v1"),
             cors_origins=cors_origins,
+            x_content_type_options=os.getenv("X_CONTENT_TYPE_OPTIONS", "nosniff"),
+            x_frame_options=os.getenv("X_FRAME_OPTIONS", "SAMEORIGIN"),
+            x_xss_protection=os.getenv("X_XSS_PROTECTION", "1; mode=block"),
+            referrer_policy=os.getenv("REFERRER_POLICY", "strict-origin-when-cross-origin"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             default_domain=os.getenv("DEFAULT_DOMAIN", "ai"),
             query_cache_ttl_seconds=int(os.getenv("QUERY_CACHE_TTL_SECONDS", "3600")),

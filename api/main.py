@@ -1,21 +1,30 @@
 from __future__ import annotations
 
-from dotenv import load_dotenv
-load_dotenv()  # Load .env before anything else reads os.environ
-
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from schema.config import get_settings
 from api.v1.router import router as v1_router
 from api.v1.reasoning import reasoning_router
 from api.middleware import add_open_access_middleware
 
-settings = get_settings()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    yield
+    # Shutdown: clean up resource pools
+    try:
+        from ingestion.neo4j.client import close_neo4j_client
+        await close_neo4j_client()
+    except Exception:
+        pass
+
 
 app = FastAPI(
     title="SYNAPSE API",
     description="Systematic, Networked, Yet Natural, Automated, Provenance-aware Schema Engine - Open Access",
     version="4.0.0",
-    docs_url="/docs"
+    docs_url="/docs",
+    lifespan=lifespan
 )
 
 # Add open access middleware (no authentication required)

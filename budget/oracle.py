@@ -37,8 +37,9 @@ class BudgetOracle:
                     budget.rpd_remaining = mdata.get("rpd_remaining", budget.rpd_remaining)
                     budget.tpm_remaining = mdata.get("tpm_remaining", budget.tpm_remaining)
                 logger.info(f"Budget Oracle restored {len(data)} models from DynamoDB")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.exception("Failed to restore budget state from DynamoDB")
+            logger.warning("Falling back to default in-memory budgets.")
         self._restored = True
 
     def _load_fallback_chains(self):
@@ -61,7 +62,12 @@ class BudgetOracle:
         effective = self._effective_tokens(model_id, estimated_tokens)
         if budget.can_afford(effective):
             budget.reserve(effective)
-            await self.scheduler.acquire(model_id)
+            try:
+                await self.scheduler.acquire(model_id)
+            except Exception:
+                # Cancel reservation to prevent token leak
+                budget.tokens_in_flight = max(0, budget.tokens_in_flight - effective)
+                raise
             return True, model_id
         return False, "local"
 

@@ -12,7 +12,8 @@ async def query_vector(question: str, limit: int = 10, score_threshold: float = 
     """Vector similarity search via Qdrant."""
     try:
         from embedding.qdrant_client import get_qdrant_client
-        generator = EmbeddingGenerator()
+        from embedding.generator import get_embedding_generator
+        generator = get_embedding_generator()
         vector = generator.generate_query_embedding(question)
         qdrant = get_qdrant_client()
         results = qdrant.search_similar(vector, limit=limit, score_threshold=score_threshold)
@@ -30,15 +31,15 @@ async def query_bm25(question: str, limit: int = 10) -> list[dict[str, Any]]:
     """BM25 keyword-based sparse retrieval over live Neo4j node text."""
     try:
         from rank_bm25 import BM25Okapi
-        from ingestion.neo4j.client import Neo4jClient
-        from schema.config import get_settings
+        from ingestion.neo4j.client import get_neo4j_client
 
-        client = Neo4jClient.from_settings(get_settings())
+        client = get_neo4j_client()
         documents: list[dict[str, Any]] = []
         async with client.session() as session:
             result = await session.run(
                 """
                 MATCH (n)
+                WHERE n.description IS NOT NULL OR n.summary IS NOT NULL OR n.content_md IS NOT NULL OR n.abstract_summary IS NOT NULL OR n.name IS NOT NULL OR n.full_name IS NOT NULL
                 WITH n, labels(n)[0] AS label
                 RETURN
                     coalesce(n.github_repo, n.full_name, n.hf_model_id, n.arxiv_id,
@@ -49,7 +50,7 @@ async def query_bm25(question: str, limit: int = 10) -> list[dict[str, Any]]:
                     coalesce(n.description, n.summary, n.abstract_summary, n.content_md, "") AS body,
                     coalesce(n.html_url, n.link, n.source_url, "") AS url,
                     n.source AS source
-                LIMIT 1000
+                LIMIT 500
                 """
             )
             async for row in result:
@@ -67,7 +68,6 @@ async def query_bm25(question: str, limit: int = 10) -> list[dict[str, Any]]:
                             "source": row.get("source") or "neo4j",
                         }
                     )
-        await client.close()
 
         if not documents:
             return []
@@ -96,9 +96,8 @@ async def query_bm25(question: str, limit: int = 10) -> list[dict[str, Any]]:
 async def query_graph(entity: str, max_depth: int = 2) -> list[dict[str, Any]]:
     """Knowledge graph traversal from an entity name."""
     try:
-        from ingestion.neo4j.client import Neo4jClient
-        from schema.config import get_settings
-        client = Neo4jClient.from_settings(get_settings())
+        from ingestion.neo4j.client import get_neo4j_client
+        client = get_neo4j_client()
         results = []
         async with client.session() as session:
             r = await session.run(
@@ -118,7 +117,6 @@ async def query_graph(entity: str, max_depth: int = 2) -> list[dict[str, Any]]:
                     "rel_type": record.get("rel_type"),
                     "related": record.get("related_name") or record.get("related_full_name") or ""
                 })
-        await client.close()
         return results
     except Exception as e:
         logger.warning(f"Graph query unavailable: {e}")
