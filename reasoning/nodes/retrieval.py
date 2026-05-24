@@ -24,7 +24,7 @@ async def retrieval_node(state: ReasoningState) -> ReasoningState:
         # Tier 2: Cross-session web research cache (from prior sessions)
         try:
             from embedding.generator import get_embedding_generator
-            gen = get_embedding_generator()
+            gen = await get_embedding_generator()
             qv = gen.generate_query_embedding(sq)
             from embedding.qdrant_client import get_qdrant_client
             qdrant = get_qdrant_client()

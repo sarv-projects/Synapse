@@ -26,6 +26,7 @@ async def output_node(state: ReasoningState) -> ReasoningState:
                 "url": url,
                 "title": r.get("title", ""),
                 "source": r.get("source", "unknown"),
+                # Truncate snippet to first 200 chars for UI display
                 "snippet": (r.get("snippet") or r.get("content", ""))[:200],
             })
 

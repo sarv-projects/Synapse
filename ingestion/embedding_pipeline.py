@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, UTC
 import uuid
 
-from embedding.generator import get_embedding_generator
+from embedding.generator import EmbeddingGenerator, get_embedding_generator
 from embedding.qdrant_client import get_qdrant_client
 from ingestion.neo4j.client import Neo4jClient
 from schema.config import get_settings
@@ -16,21 +16,27 @@ class EmbeddingPipeline:
     """Pipeline for generating and storing embeddings for nodes."""
     
     def __init__(self):
-        self.embedding_generator = get_embedding_generator()
+        self.embedding_generator: EmbeddingGenerator | None = None
         self.qdrant_client = get_qdrant_client()
         self.settings = get_settings()
         self.neo4j_client = None  # Will be initialized when needed
+
+    async def ensure_initialized(self) -> EmbeddingGenerator:
+        if self.embedding_generator is None:
+            self.embedding_generator = await get_embedding_generator()
+        return self.embedding_generator
     
     async def process_documents(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Process a batch of documents and generate embeddings.
-        
+
         Args:
             documents: List of documents with extracted entities
-            
+
         Returns:
             Dict with processing results
         """
+        _ = await self.ensure_initialized()
         results = {
             "processed": 0,
             "embeddings_generated": 0,
@@ -128,7 +134,7 @@ class EmbeddingPipeline:
                     results["embeddings_generated"] += 1
             except Exception as e:
                 error_msg = f"Failed to generate embedding for {entity.get('type')} {entity.get('id')}: {e}"
-                logger.error(error_msg)
+                logger.error(error_msg, exc_info=True)
                 results["errors"].append(error_msg)
         
         if not embedding_vectors:
@@ -165,14 +171,16 @@ class EmbeddingPipeline:
     def _generate_embedding_for_entity(self, entity: Dict[str, Any]) -> Optional[List[float]]:
         """Generate embedding for a specific entity."""
         entity_type = entity.get("type")
-        
+        gen = self.embedding_generator
+        assert gen is not None
+
         if entity_type == "Paper":
-            return self.embedding_generator.generate_paper_embedding(
+            return gen.generate_paper_embedding(
                 entity.get("title", ""),
                 entity.get("abstract", "")
             )
         elif entity_type in ["Model", "Tool", "Technique"]:
-            return self.embedding_generator.generate_entity_embedding(
+            return gen.generate_entity_embedding(
                 entity.get("name", ""),
                 entity.get("description", "")
             )
@@ -220,7 +228,7 @@ class EmbeddingPipeline:
                     await self._create_embedding_index_node(session, entity, item["vector"])
                     
                 except Exception as e:
-                    logger.error(f"Failed to update Neo4j embedding for {entity_type} {entity_id}: {e}")
+                    logger.error(f"Failed to update Neo4j embedding for {entity_type} {entity_id}: {e}", exc_info=True)
         
         return updated_count
     
@@ -245,15 +253,16 @@ class EmbeddingPipeline:
         )
     
     async def search_similar_entities(
-        self, 
-        query_text: str, 
+        self,
+        query_text: str,
         entity_type: Optional[str] = None,
         limit: int = 10,
         score_threshold: float = 0.85
     ) -> List[Dict[str, Any]]:
         """Search for similar entities using vector similarity."""
+        gen = await self.ensure_initialized()
         # Generate query embedding
-        query_vector = self.embedding_generator.generate_query_embedding(query_text)
+        query_vector = gen.generate_query_embedding(query_text)
         
         # Search Qdrant
         similar_items = self.qdrant_client.search_similar(
@@ -292,12 +301,13 @@ class EmbeddingPipeline:
                         })
                         
                 except Exception as e:
-                    logger.error(f"Failed to fetch entity {entity_uuid}: {e}")
+                    logger.error(f"Failed to fetch entity {entity_uuid}: {e}", exc_info=True)
         
         return results
     
     async def get_embedding_stats(self) -> Dict[str, Any]:
         """Get statistics about the embedding pipeline."""
+        _ = await self.ensure_initialized()
         # Get Qdrant collection info
         qdrant_stats = self.qdrant_client.get_collection_info()
         
@@ -330,9 +340,10 @@ class EmbeddingPipeline:
 # Global pipeline instance
 _embedding_pipeline = None
 
-def get_embedding_pipeline() -> EmbeddingPipeline:
+async def get_embedding_pipeline() -> EmbeddingPipeline:
     """Get the global embedding pipeline instance."""
     global _embedding_pipeline
     if _embedding_pipeline is None:
         _embedding_pipeline = EmbeddingPipeline()
+        await _embedding_pipeline.ensure_initialized()
     return _embedding_pipeline

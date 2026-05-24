@@ -85,6 +85,18 @@ class SQSJobQueue:
         except Exception as e:
             logger.debug(f"SQS delete failed: {e}")
 
+    async def send_raw_message(self, body: dict) -> bool:
+        """Send a generic JSON message to the queue (used for budget persistence fallback)."""
+        if not self._available:
+            return False
+        try:
+            message = json.dumps(body)
+            self._client.send_message(QueueUrl=self.queue_url, MessageBody=message)
+            return True
+        except Exception as e:
+            logger.warning(f"SQS raw message send failed: {e}")
+            return False
+
 
 _queue: SQSJobQueue | None = None
 

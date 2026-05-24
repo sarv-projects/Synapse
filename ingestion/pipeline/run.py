@@ -120,7 +120,7 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
     embeddings_result = {"embeddings_generated": 0, "errors": []}
     try:
         from ingestion.embedding_pipeline import get_embedding_pipeline
-        emb_pipeline = get_embedding_pipeline()
+        emb_pipeline = await get_embedding_pipeline()
         node_dicts = _nodes_to_dicts(state.nodes)
         if node_dicts:
             embeddings_result = await emb_pipeline.process_documents(node_dicts)

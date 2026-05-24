@@ -19,7 +19,7 @@ from typing import Any
 
 from ingestion.pipeline.state import PipelineState
 from ingestion.sources.base import SourceDocument
-from schema.models import FactTier, GraphEdge, GraphNode, NodeStatus, ProvenanceRecord
+from schema.models import FactTier, GraphEdge, GraphNode, NodeStatus, ProvenanceRecord, VerificationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def _provenance(source: str, method: str, confidence: float = 0.9) -> Provenance
         evidence_source=source,
         extraction_method=method,
         confidence=confidence,
-        verification_status="unverified",  # type: ignore[arg-type]
+        verification_status=VerificationStatus.UNVERIFIED,
     )
 
 

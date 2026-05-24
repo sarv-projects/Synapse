@@ -1,4 +1,5 @@
 """Middleware for SYNAPSE v3.0 - Open access, rate limiting, security headers."""
+import asyncio
 import time
 import logging
 from collections import defaultdict
@@ -13,15 +14,47 @@ from schema.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+_rate_limiter_instance: "RateLimitMiddleware | None" = None
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """IP-based rate limiting — 120 req/min, open access."""
+    """IP-based rate limiting — 30 req/min, open access."""
 
-    def __init__(self, app, requests_per_minute: int = 120):
+    def __init__(self, app, requests_per_minute: int = 30):
         super().__init__(app)
         self.rpm = requests_per_minute
         self.clients: dict[str, list[float]] = defaultdict(list)
         self.last_pruned = time.time()
+        self._prune_task: asyncio.Task[None] | None = None
+        global _rate_limiter_instance
+        _rate_limiter_instance = self
+
+    async def start(self):
+        """Start the periodic prune background task."""
+        if self._prune_task is None or self._prune_task.done():
+            self._prune_task = asyncio.create_task(self._periodic_prune())
+
+    async def stop(self):
+        """Cancel the periodic prune background task."""
+        if self._prune_task and not self._prune_task.done():
+            _ = self._prune_task.cancel()
+            try:
+                await self._prune_task
+            except asyncio.CancelledError:
+                pass
+            self._prune_task = None
+
+    async def _periodic_prune(self):
+        while True:
+            await asyncio.sleep(300)
+            now = time.time()
+            self.last_pruned = now
+            expired_ips = [ip for ip, reqs in self.clients.items() if not reqs or now - reqs[-1] > 3600]
+            for ip in expired_ips:
+                try:
+                    del self.clients[ip]
+                except KeyError:
+                    pass
 
     async def dispatch(self, request: Request, call_next: Callable):
         # Never rate-limit health or docs
@@ -33,13 +66,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Slide the window
         self.clients[client_ip] = [t for t in self.clients[client_ip] if now - t < 60]
-
-        # Periodically prune expired clients to prevent memory leak
-        if now - self.last_pruned > 300:
-            self.last_pruned = now
-            expired_ips = [ip for ip, reqs in self.clients.items() if not reqs]
-            for ip in expired_ips:
-                del self.clients[ip]
 
         if len(self.clients[client_ip]) >= self.rpm:
             logger.warning(f"Rate limit exceeded for {client_ip}")
@@ -81,5 +107,5 @@ def add_open_access_middleware(app: FastAPI) -> None:
     # Security headers
     app.add_middleware(SecurityHeadersMiddleware)
 
-    # Rate limiting
-    app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+    # Rate limiting — 30 RPM per client IP as per SYNAPSE v4.0 spec
+    app.add_middleware(RateLimitMiddleware, requests_per_minute=30)

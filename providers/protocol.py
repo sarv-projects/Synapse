@@ -1,6 +1,7 @@
 """InferenceProvider Protocol — the only interface for model calls in v4.0."""
+import collections.abc
 from dataclasses import dataclass, field
-from typing import AsyncIterator, Literal, Protocol
+from typing import Literal, Protocol
 
 
 @dataclass
@@ -12,8 +13,8 @@ class AssembledPrompt:
     task: str = ""
     estimated_tokens: int = 0
 
-    def to_messages(self) -> list[dict]:
-        messages = []
+    def to_messages(self) -> list[dict[str, str]]:
+        messages: list[dict[str, str]] = []
         if self.system:
             messages.append({"role": "system", "content": self.system})
         ctx = "\n\n".join(self.context) if self.context else ""
@@ -57,5 +58,6 @@ class InferenceProvider(Protocol):
     async def generate(self, prompt: AssembledPrompt, config: InferenceConfig) -> InferenceResult:
         ...
 
-    async def stream(self, prompt: AssembledPrompt, config: InferenceConfig) -> AsyncIterator[str]:
+    async def stream(self, prompt: AssembledPrompt, config: InferenceConfig) -> collections.abc.AsyncIterator[str]:
         ...
+

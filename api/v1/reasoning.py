@@ -5,6 +5,8 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
+from typing import Any
+
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
@@ -27,7 +29,34 @@ class WebhookSubscriptionRequest(BaseModel):
 
 
 # In-memory job store (DynamoDB in production)
-_jobs: dict[str, dict] = {}
+_jobs: dict[str, dict[str, Any]] = {}
+_jobs_lock = asyncio.Lock()
+
+# Tracked background tasks for graceful shutdown
+_background_tasks: set[asyncio.Task[None]] = set()
+
+
+def _track_task(task: asyncio.Task[None]) -> asyncio.Task[None]:
+    """Track a background task so it can be cancelled on shutdown."""
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
+async def _get_job(job_id: str) -> dict | None:
+    async with _jobs_lock:
+        return _jobs.get(job_id)
+
+
+async def _set_job(job_id: str, state: dict) -> None:
+    async with _jobs_lock:
+        _jobs[job_id] = state
+
+
+async def _update_job(job_id: str, **kwargs) -> None:
+    async with _jobs_lock:
+        if job_id in _jobs:
+            _jobs[job_id].update(kwargs)
 
 
 @reasoning_router.post("/reason")
@@ -36,12 +65,12 @@ async def reason(request: ReasonRequest):
     job_id = str(uuid.uuid4())
     session_id = request.session_id or str(uuid.uuid4())
 
-    _jobs[job_id] = {
+    await _set_job(job_id, {
         "job_id": job_id, "status": "PENDING", "current_node": "",
         "query": request.query, "session_id": session_id,
         "format": request.format, "created_at": datetime.now(UTC).isoformat(),
         "result": None,
-    }
+    })
 
     # Try SQS queue first, fall back to direct task spawning
     try:
@@ -50,18 +79,22 @@ async def reason(request: ReasonRequest):
         await sqs.connect()
         enqueued = await sqs.enqueue(job_id, request.query, session_id, request.format)
         if not enqueued:
-            asyncio.create_task(_run_reasoning_pipeline(job_id, request.query, session_id, request.format))
-    except Exception:
-        asyncio.create_task(_run_reasoning_pipeline(job_id, request.query, session_id, request.format))
+            _track_task(asyncio.create_task(_run_reasoning_pipeline(job_id, request.query, session_id, request.format)))
+    except Exception as e:
+        logger.error(f"SQS enqueue failed for job {job_id}, falling back to direct task: {e}", exc_info=True)
+        _track_task(asyncio.create_task(_run_reasoning_pipeline(job_id, request.query, session_id, request.format)))
 
     # Save to DynamoDB for persistence
     try:
         from budget.dynamodb import get_dynamodb_store
         db = get_dynamodb_store()
         await db.connect()
-        await db.save_job(job_id, _jobs[job_id])
-    except Exception:
-        pass
+        job = await _get_job(job_id)
+        if job:
+            await db.save_job(job_id, job)
+    except Exception as e:
+        logger.error(f"Failed to persist job {job_id} to DynamoDB: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save job state")
 
     return {"job_id": job_id, "status": "PENDING"}
 
@@ -73,23 +106,21 @@ async def _run_reasoning_pipeline(job_id: str, query: str, session_id: str, fmt:
         from reasoning.graph.builder import GraphBuilder
 
         state = ReasoningState(query=query, session_id=session_id, format=fmt)
-        _jobs[job_id]["status"] = "PROCESSING"
+        await _update_job(job_id, status="PROCESSING")
 
         graph = GraphBuilder().build()
         async for update in graph.astream(state):
             state = _merge_graph_update(state, update)
             if state.current_node:
-                _jobs[job_id]["current_node"] = state.current_node
+                await _update_job(job_id, current_node=state.current_node)
             if state.current_node in {"entry", "synthesis", "output"}:
                 await _save_checkpoint(state, state.current_node)
             if state.status == "FAILED":
-                _jobs[job_id]["status"] = "FAILED"
-                _jobs[job_id]["error"] = state.error
+                await _update_job(job_id, status="FAILED", error=state.error)
                 await _persist_job(job_id)
                 return
 
-        _jobs[job_id]["status"] = "COMPLETE"
-        _jobs[job_id]["result"] = {
+        result = {
             "markdown": state.final_markdown,
             "synthesis_markdown": state.synthesis_markdown,
             "confidence_map": state.confidence_map,
@@ -101,29 +132,31 @@ async def _run_reasoning_pipeline(job_id: str, query: str, session_id: str, fmt:
             "retrieval_confidence": state.retrieval_confidence,
             "web_research_used": state.web_research_used,
         }
-        _jobs[job_id]["produced_by"] = state.produced_by
+        await _update_job(job_id, status="COMPLETE", result=result, produced_by=state.produced_by)
 
         # Attach RAGAS evaluation scores
         try:
             from eval.ragas_monitor import get_ragas_monitor
             latest = get_ragas_monitor().latest()
             if latest:
-                _jobs[job_id]["ragas_eval"] = {
+                ragas_eval = {
                     "faithfulness": round(latest.faithfulness, 3),
                     "answer_relevancy": round(latest.answer_relevancy, 3),
                     "context_precision": round(latest.context_precision, 3),
                     "context_recall": round(latest.context_recall, 3),
                 }
-                _jobs[job_id]["result"]["ragas_eval"] = _jobs[job_id]["ragas_eval"]
-        except Exception:
-            pass
+                await _update_job(job_id, ragas_eval=ragas_eval)
+                job = await _get_job(job_id)
+                if job and "result" in job:
+                    job["result"]["ragas_eval"] = ragas_eval
+        except Exception as e:
+            logger.error(f"Failed to attach RAGAS eval for job {job_id}: {e}", exc_info=True)
 
         await _save_checkpoint(state, "output")
 
     except Exception as e:
         logger.exception(f"Reasoning pipeline failed for {job_id}")
-        _jobs[job_id]["status"] = "FAILED"
-        _jobs[job_id]["error"] = str(e)
+        await _update_job(job_id, status="FAILED", error=str(e))
 
     await _persist_job(job_id)
 
@@ -172,8 +205,8 @@ async def _save_checkpoint(state, name: str):
             "total_tokens_used": state.total_tokens_used,
         }
         await store.save(state.session_id, name, state_dict)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to save checkpoint for session {state.session_id}: {e}", exc_info=True)
 
 
 async def _persist_job(job_id: str):
@@ -181,15 +214,17 @@ async def _persist_job(job_id: str):
         from budget.dynamodb import get_dynamodb_store
         db = get_dynamodb_store()
         await db.connect()
-        await db.save_job(job_id, _jobs.get(job_id, {}))
-    except Exception:
-        pass
+        job = await _get_job(job_id)
+        if job:
+            await db.save_job(job_id, job)
+    except Exception as e:
+        logger.error(f"Failed to persist job {job_id} to DynamoDB: {e}", exc_info=True)
 
 
 @reasoning_router.get("/reason/{job_id}")
 async def get_reason_result(job_id: str, format: str | None = Query(default=None)):
     """Poll for reasoning job result."""
-    job = _jobs.get(job_id)
+    job = await _get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 

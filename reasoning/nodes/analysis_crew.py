@@ -88,6 +88,7 @@ async def _run_contradiction_detector_crewai(context: str, state: ReasoningState
         from reasoning.nodes.contradiction_detector import run_contradiction_detector_crewai
         return await run_contradiction_detector_crewai(state)
     except ImportError:
+        # Expected: CrewAI contradiction detector not installed, fall back to plain node
         pass
     except Exception as e:
         logger.warning(f"CrewAI contradiction detector unavailable: {e}")

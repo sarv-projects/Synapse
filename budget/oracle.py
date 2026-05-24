@@ -2,8 +2,9 @@
 import asyncio
 import logging
 import yaml
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from budget.register import BudgetRegister, ModelBudget
 from budget.scheduler import LeakyBucketScheduler
@@ -18,7 +19,7 @@ class BudgetOracle:
     def __init__(self):
         self.register = BudgetRegister()
         self.scheduler = LeakyBucketScheduler()
-        self.fallback_chains: dict = {}
+        self.fallback_chains: dict[str, dict[str, Any]] = {}
         self._load_fallback_chains()
         self._restored = False
 
@@ -103,6 +104,12 @@ class BudgetOracle:
         if headers:
             budget.update_from_headers(headers)
 
+    def release_reservation(self, model_id: str, estimated_tokens: int):
+        """Manually release a reservation (e.g., on failure before call)."""
+        budget = self.register.get(model_id)
+        effective = self._effective_tokens(model_id, estimated_tokens)
+        budget.tokens_in_flight = max(0, budget.tokens_in_flight - effective)
+
     def snapshot(self) -> dict:
         return self.register.snapshot()
 
@@ -113,7 +120,20 @@ class BudgetOracle:
             await db.connect()
             await db.save_budget(self.snapshot())
         except Exception as e:
-            logger.debug(f"Budget persist skipped: {e}")
+            logger.error(f"Failed to persist budget state to DynamoDB: {e}", exc_info=True)
+            try:
+                from budget.sqs_queue import get_sqs_queue
+                sqs = get_sqs_queue()
+                await sqs.connect()
+                sent = await sqs.send_raw_message({
+                    "type": "budget_persist",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "budget": self.snapshot(),
+                })
+                if not sent:
+                    logger.critical("Budget persistence failed completely: DynamoDB and SQS fallback both unavailable")
+            except Exception as sqs_e:
+                logger.critical(f"Budget persistence failed completely: {sqs_e}")
 
     def routing_log(self) -> list[dict]:
         return self.scheduler.recent_routes

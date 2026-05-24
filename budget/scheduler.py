@@ -26,6 +26,7 @@ class LeakyBucketScheduler:
 
     def _get_semaphore(self, model_id: str) -> asyncio.Semaphore:
         if model_id not in self._semaphores:
+            # Default concurrency limit per model (conservative to avoid rate limits)
             limit = self.MODEL_CONCURRENCY.get(model_id, 2)
             self._semaphores[model_id] = asyncio.Semaphore(limit)
         return self._semaphores[model_id]
@@ -36,6 +37,7 @@ class LeakyBucketScheduler:
         max_delay = 30
         while True:
             try:
+                # Semaphore timeout (5s allows for network latency + processing)
                 await asyncio.wait_for(sem.acquire(), timeout=5.0)
                 self._log_route(model_id, "acquired")
                 return

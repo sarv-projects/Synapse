@@ -28,8 +28,8 @@ try:
     ZENROWS_API_KEY = os.getenv("ZENROWS_API_KEY", "")
     if ZENROWS_API_KEY:
         ZENROWS_AVAILABLE = True
-except Exception:
-    pass
+except Exception as e:
+    logger.warning(f"Non-critical failure checking ZenRows (continuing): {e}")
 
 
 async def _search_duckduckgo(queries: list[dict]) -> list[dict]:
@@ -56,11 +56,11 @@ async def _search_duckduckgo(queries: list[dict]) -> list[dict]:
                             "source": "duckduckgo",
                         })
                 except Exception as e:
-                    logger.debug(f"DuckDuckGo query failed: {e}")
+                    logger.error(f"DuckDuckGo query failed: {e}", exc_info=True)
     except ImportError:
         logger.warning("duckduckgo-search not installed")
     except Exception as e:
-        logger.warning(f"DuckDuckGo search failed: {e}")
+        logger.error(f"DuckDuckGo search failed: {e}", exc_info=True)
     return results
 
 
@@ -97,9 +97,9 @@ async def _search_tavily(queries: list[dict]) -> list[dict]:
                         "score": r.get("score", 0),
                     })
             except Exception as e:
-                logger.debug(f"Tavily query failed: {e}")
+                logger.error(f"Tavily query failed: {e}", exc_info=True)
     except Exception as e:
-        logger.warning(f"Tavily search failed: {e}")
+        logger.error(f"Tavily search failed: {e}", exc_info=True)
     return results
 
 
@@ -131,12 +131,12 @@ async def _fetch_with_crawl4ai(urls: list[str]) -> list[dict]:
                     if zenrows_result:
                         results.append(zenrows_result)
                 except Exception as e:
-                    logger.debug(f"Crawl4AI fetch failed for {url}: {e}")
+                    logger.error(f"Crawl4AI fetch failed for {url}: {e}", exc_info=True)
                     zenrows_result = await _fetch_with_zenrows(url)
                     if zenrows_result:
                         results.append(zenrows_result)
     except Exception as e:
-        logger.warning(f"Crawl4AI crawler failed, falling back to aiohttp: {e}")
+        logger.error(f"Crawl4AI crawler failed, falling back to aiohttp: {e}", exc_info=True)
         results = await _fetch_with_aiohttp(urls)
     return results
 
@@ -162,7 +162,7 @@ async def _fetch_with_zenrows(url: str) -> dict | None:
                         "fetched_at": "", "source": "zenrows",
                     }
     except Exception as e:
-        logger.debug(f"ZenRows fallback failed for {url}: {e}")
+        logger.error(f"ZenRows fallback failed for {url}: {e}", exc_info=True)
     return None
 
 
@@ -185,7 +185,7 @@ async def _fetch_with_aiohttp(urls: list[str]) -> list[dict]:
                             "fetched_at": "", "source": "aiohttp",
                         })
             except Exception as e:
-                logger.debug(f"aiohttp fetch failed for {url}: {e}")
+                logger.error(f"aiohttp fetch failed for {url}: {e}", exc_info=True)
     return results
 
 

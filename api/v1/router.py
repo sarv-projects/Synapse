@@ -53,6 +53,7 @@ async def health():
                 result["nodes_with_embeddings"] = row3["c"]
         await client.close()
     except Exception as e:
+        logger.error(f"Health check failed: {e}", exc_info=True)
         result["status"] = "degraded"
         result["db_error"] = str(e)
 
@@ -96,6 +97,7 @@ async def whats_new(days: int = Query(default=1, ge=1, le=30)):
         await client.close()
         return {"days": days, "entities": entities, "recent": recent}
     except Exception as e:
+        logger.error(f"Whats-new query failed: {e}", exc_info=True)
         await client.close()
         return {"days": days, "entities": [], "recent": [], "error": str(e)}
 
@@ -167,6 +169,7 @@ async def search(
         await client.close()
         return {"results": results, "next_cursor": None, "total_hint": len(results)}
     except Exception as e:
+        logger.error(f"Search query failed: {e}", exc_info=True)
         await client.close()
         return {"results": [], "next_cursor": None, "total_hint": 0, "error": str(e)}
 
@@ -229,6 +232,7 @@ async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
         await client.close()
         return {"similar": results, "query_id": id}
     except Exception as e:
+        logger.error(f"Similar query failed: {e}", exc_info=True)
         await client.close()
         return {"similar": [], "error": str(e)}
 
@@ -317,6 +321,7 @@ async def diff(
         await client.close()
         return {"added": added, "removed": removed, "from": from_date, "to": to_date}
     except Exception as e:
+        logger.error(f"Diff query failed: {e}", exc_info=True)
         await client.close()
         return {"added": [], "removed": [], "from": from_date, "to": to_date, "error": str(e)}
 
@@ -380,6 +385,7 @@ async def leaderboard(
         await client.close()
         return {"type": type, "items": items, "count": len(items)}
     except Exception as e:
+        logger.error(f"Leaderboard query failed: {e}", exc_info=True)
         await client.close()
         return {"type": type, "items": [], "error": str(e)}
 
@@ -412,6 +418,7 @@ async def changelog():
         await client.close()
         return {"entries": entries}
     except Exception as e:
+        logger.error(f"Changelog query failed: {e}", exc_info=True)
         await client.close()
         return {"entries": [], "error": str(e)}
 
@@ -508,6 +515,7 @@ async def technique_ecosystem(name: str = Path(...)):
         await client.close()
         return {"name": name, "nodes": nodes, "edges": edges}
     except Exception as e:
+        logger.error(f"Technique ecosystem query failed: {e}", exc_info=True)
         await client.close()
         return {"name": name, "nodes": [], "edges": [], "error": str(e)}
 
@@ -552,6 +560,7 @@ async def org_releases(name: str = Path(...), since: Optional[str] = Query(defau
         await client.close()
         return {"org": name, "items": items, "count": len(items)}
     except Exception as e:
+        logger.error(f"Org releases query failed: {e}", exc_info=True)
         await client.close()
         return {"org": name, "items": [], "error": str(e)}
 
@@ -589,6 +598,7 @@ async def model_lineage(hf_id: str = Path(...)):
         await client.close()
         return dict(row)
     except Exception as e:
+        logger.error(f"Model lineage query failed: {e}", exc_info=True)
         await client.close()
         return {"id": hf_id, "error": str(e)}
 
@@ -615,6 +625,7 @@ async def nl_query(body: NLQueryRequest):
         )
         return result
     except Exception as e:
+        logger.error(f"NL query failed: {e}", exc_info=True)
         return {
             "success": False,
             "error": str(e),
@@ -635,7 +646,8 @@ async def query_suggestions(q: Optional[str] = Query(default="")):
         translator = get_nl_translator()
         suggestions = await translator.get_query_suggestions(q or "")
         return suggestions
-    except Exception:
+    except Exception as e:
+        logger.error(f"Query suggestions failed: {e}", exc_info=True)
         return [
             "Find the latest papers about transformers",
             "Show me top models for text generation",

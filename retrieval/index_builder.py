@@ -1,6 +1,6 @@
 """Retrieval layer — LlamaIndex RouterQueryEngine with VectorStoreIndex + BM25 + KG."""
 import logging
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class HybridRetrievalEngine:
     def __init__(self):
         self._vector_index = None
         self._bm25_index = None
-        self._query_engines: dict[str, Any] = {}
+        self._query_engines: dict[str, Callable[..., Any]] = {}
         self._initialized = False
 
     async def initialize(self):

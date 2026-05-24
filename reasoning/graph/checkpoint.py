@@ -96,7 +96,13 @@ class LangGraphCheckpoint:
 
     async def close(self):
         if self._pool:
-            await self._pool.close()
+            try:
+                await self._pool.close()
+            except Exception as e:
+                logger.error(f"Failed to close checkpoint pool: {e}", exc_info=True)
+            finally:
+                self._pool = None
+                self._connected = False
 
 
 _checkpoint: LangGraphCheckpoint | None = None

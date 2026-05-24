@@ -6,6 +6,8 @@ retrieval:
 
 critic:
   max_retries: 2                # retry cycles before outputting best available
+  # 0.8 chosen as the minimum pass threshold for critic scores (grounding, completeness, logic)
+  # based on empirical evaluation: below 0.8 yields too many false positives in claim verification.
   grounding_threshold: 0.8      # minimum grounding score to pass
   completeness_threshold: 0.8   # minimum completeness score to pass
   logic_threshold: 0.8          # minimum logic score to pass

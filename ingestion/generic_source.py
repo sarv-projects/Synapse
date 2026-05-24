@@ -1,7 +1,6 @@
 """Generic configurable source system."""
 from typing import Dict, Any, List, Optional
 import httpx
-import asyncio
 import logging
 from dataclasses import dataclass, field
 import xml.etree.ElementTree as ET
@@ -98,24 +97,97 @@ class GenericSourceFetcher(SourceFetcher):
             return []
 
     async def _fetch_rest_json(self) -> List[SourceDocument]:
-        try:
-            response = await self.client.get(self.config.base_url, params=self.config.fetch_params)
-            response.raise_for_status()
-            data = response.json()
-            return [d for d in (self._create_document_from_json(item) for item in self._extract_items_from_json(data)) if d]
-        except Exception as e:
-            logger.error(f"REST JSON fetch failed for {self.config.name}: {e}")
-            raise
+        documents: List[SourceDocument] = []
+        url = self.config.base_url
+        params = dict(self.config.fetch_params or {})
+        pagination = self.config.pagination or {}
+        strategy = pagination.get("strategy", "none")
+        max_pages = pagination.get("max_pages", 10 if strategy != "none" else 1)
+
+        for _page in range(max_pages):
+            try:
+                response = await self.client.get(url, params=params)
+                _ = response.raise_for_status()
+                data = response.json()
+            except Exception as e:
+                logger.error(f"REST JSON fetch failed for {self.config.name}: {e}")
+                raise
+
+            items = self._extract_items_from_json(data)
+            for item in items:
+                doc = self._create_document_from_json(item)
+                if doc:
+                    documents.append(doc)
+
+            if strategy == "none":
+                break
+
+            next_url = None
+            if strategy == "link_header":
+                next_url = self._extract_link_header_next(response)
+            elif strategy == "json_key":
+                next_key = pagination.get("next_key", "next")
+                next_url = self._extract_json_next(data, next_key)
+            elif strategy == "offset_limit":
+                limit_key = pagination.get("limit_param", "limit")
+                offset_key = pagination.get("offset_param", "offset")
+                current_limit = params.get(limit_key, 50)
+                current_offset = params.get(offset_key, 0)
+                params[offset_key] = current_offset + current_limit
+                url = self.config.base_url
+                continue
+
+            if not next_url:
+                break
+            url = next_url
+            params = {}
+
+        return documents
 
     async def _fetch_rest_xml(self) -> List[SourceDocument]:
-        try:
-            response = await self.client.get(self.config.base_url, params=self.config.fetch_params)
-            response.raise_for_status()
-            root = ET.fromstring(response.text)
-            return [d for d in (self._create_document_from_xml(item) for item in self._extract_items_from_xml(root)) if d]
-        except Exception as e:
-            logger.error(f"REST XML fetch failed for {self.config.name}: {e}")
-            raise
+        documents: List[SourceDocument] = []
+        url = self.config.base_url
+        params = dict(self.config.fetch_params or {})
+        pagination = self.config.pagination or {}
+        strategy = pagination.get("strategy", "none")
+        max_pages = pagination.get("max_pages", 10 if strategy != "none" else 1)
+
+        for _page in range(max_pages):
+            try:
+                response = await self.client.get(url, params=params)
+                _ = response.raise_for_status()
+                root = ET.fromstring(response.text)
+            except Exception as e:
+                logger.error(f"REST XML fetch failed for {self.config.name}: {e}")
+                raise
+
+            items = self._extract_items_from_xml(root)
+            for item in items:
+                doc = self._create_document_from_xml(item)
+                if doc:
+                    documents.append(doc)
+
+            if strategy == "none":
+                break
+
+            next_url = None
+            if strategy == "link_header":
+                next_url = self._extract_link_header_next(response)
+            elif strategy == "offset_limit":
+                limit_key = pagination.get("limit_param", "limit")
+                offset_key = pagination.get("offset_param", "offset")
+                current_limit = params.get(limit_key, 50)
+                current_offset = params.get(offset_key, 0)
+                params[offset_key] = current_offset + current_limit
+                url = self.config.base_url
+                continue
+
+            if not next_url:
+                break
+            url = next_url
+            params = {}
+
+        return documents
 
     async def _fetch_rss(self) -> List[SourceDocument]:
         try:
@@ -125,9 +197,50 @@ class GenericSourceFetcher(SourceFetcher):
             logger.error(f"RSS fetch failed for {self.config.name}: {e}")
             raise
 
+    def _extract_link_header_next(self, response: httpx.Response) -> Optional[str]:
+        link_header = response.headers.get("link")
+        if not link_header:
+            return None
+        for part in link_header.split(","):
+            parts = part.split(";")
+            if len(parts) < 2:
+                continue
+            url_part = parts[0].strip()
+            rel_part = parts[1].strip()
+            if 'rel="next"' in rel_part and url_part.startswith("<") and url_part.endswith(">"):
+                return url_part[1:-1]
+        return None
+
+    def _extract_json_next(self, data: Any, next_key: str) -> Optional[str]:
+        if isinstance(data, dict):
+            keys = next_key.split(".")
+            curr = data
+            for key in keys:
+                if isinstance(curr, dict) and key in curr:
+                    curr = curr[key]
+                else:
+                    return None
+            if isinstance(curr, str):
+                return curr
+        return None
+
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _extract_items_from_json(self, data) -> List[Dict[str, Any]]:
+        rules = self.config.extraction_rules
+        if rules and "items_path" in rules:
+            path = rules["items_path"]
+            parts = path.split(".")
+            curr = data
+            try:
+                for part in parts:
+                    curr = curr[part]
+                if isinstance(curr, list):
+                    return curr
+            except (KeyError, TypeError):
+                # Expected: path segment not in dict or curr is not a dict, return empty list
+                pass
+        
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
@@ -137,6 +250,12 @@ class GenericSourceFetcher(SourceFetcher):
         return []
 
     def _extract_items_from_xml(self, root: ET.Element) -> List[ET.Element]:
+        rules = self.config.extraction_rules
+        if rules and "items_xpath" in rules:
+            items = root.findall(rules["items_xpath"])
+            if items:
+                return items
+
         for tag in ("item", "entry", "paper", "model"):
             items = root.findall(f".//{tag}")
             if items:
@@ -181,6 +300,12 @@ class GenericSourceFetcher(SourceFetcher):
             return None
 
     def _extract_id(self, item: Dict[str, Any]) -> Optional[str]:
+        rules = self.config.extraction_rules
+        if rules and "id_field" in rules:
+            field = rules["id_field"]
+            if item.get(field):
+                return str(item[field])
+
         for key in ("id", "arxiv_id", "hf_model_id", "github_repo", "paperId"):
             if item.get(key):
                 return str(item[key])
@@ -198,12 +323,13 @@ class GenericSourceFetcher(SourceFetcher):
         coverage = self.config.entity_coverage
         return coverage[0] if coverage else "Paper"
 
-    def _xml_to_dict(self, element: ET.Element) -> Dict[str, Any]:
+    def _xml_to_dict(self, element: ET.Element) -> Any:
         result: Dict[str, Any] = dict(element.attrib)
-        if element.text and element.text.strip():
+        text = element.text.strip() if element.text else ""
+        if text:
             if len(element) == 0:
-                return element.text.strip()  # type: ignore[return-value]
-            result["text"] = element.text.strip()
+                return text
+            result["text"] = text
         for child in element:
             child_data = self._xml_to_dict(child)
             if child.tag in result:

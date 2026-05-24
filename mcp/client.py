@@ -26,7 +26,7 @@ class MCPStdioClient:
         self._process: subprocess.Popen | None = None
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
-        self._tools: dict[str, dict] = {}
+        self._tools: dict[str, dict[str, Any]] = {}
         self._connected = False
 
     async def connect(self) -> bool:
@@ -116,7 +116,7 @@ class MCPClientManager:
 
     def __init__(self):
         self._servers: dict[str, MCPStdioClient] = {}
-        self._tool_wrappers: dict[str, Any] = {}
+        self._tool_wrappers: dict[str, callable] = {}
         self._init_servers()
 
     def _init_servers(self):
@@ -136,9 +136,11 @@ class MCPClientManager:
             await server.connect()
 
     async def close_all(self):
-        for server in self._servers.values():
-            await server.close()
-        self._servers.clear()
+        try:
+            for server in self._servers.values():
+                await server.close()
+        finally:
+            self._servers.clear()
 
     def get_tool_schemas(self) -> list[str]:
         schemas = []

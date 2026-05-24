@@ -3,37 +3,15 @@ import logging
 import re
 from typing import Any
 
-from embedding.generator import EmbeddingGenerator
-
 logger = logging.getLogger(__name__)
 
 
 async def query_vector(question: str, limit: int = 10, score_threshold: float = 0.7) -> list[dict[str, Any]]:
     """Vector similarity search via Qdrant."""
     try:
-        from embedding.qdrant_client import get_qdrant_client
-        from embedding.generator import get_embedding_generator
-        generator = get_embedding_generator()
-        vector = generator.generate_query_embedding(question)
-        qdrant = get_qdrant_client()
-        results = qdrant.search_similar(vector, limit=limit, score_threshold=score_threshold)
-        return [
-            {"id": r["payload"].get("uuid", ""), "label": r["payload"].get("label", ""),
-             "name": r["payload"].get("name", ""), "score": r["score"]}
-            for r in results
-        ]
-    except Exception as e:
-        logger.warning(f"Vector query unavailable: {e}")
-        return []
-
-
-async def query_bm25(question: str, limit: int = 10) -> list[dict[str, Any]]:
-    """BM25 keyword-based sparse retrieval over live Neo4j node text."""
-    try:
-        from rank_bm25 import BM25Okapi
         from ingestion.neo4j.client import get_neo4j_client
 
-        client = get_neo4j_client()
+        client = await get_neo4j_client()
         documents: list[dict[str, Any]] = []
         async with client.session() as session:
             result = await session.run(
@@ -97,7 +75,7 @@ async def query_graph(entity: str, max_depth: int = 2) -> list[dict[str, Any]]:
     """Knowledge graph traversal from an entity name."""
     try:
         from ingestion.neo4j.client import get_neo4j_client
-        client = get_neo4j_client()
+        client = await get_neo4j_client()
         results = []
         async with client.session() as session:
             r = await session.run(

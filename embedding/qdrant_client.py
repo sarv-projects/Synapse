@@ -29,6 +29,7 @@ class QdrantVectorStore:
             self.client.get_collection(self.collection_name)
             logger.info(f"Collection {self.collection_name} already exists")
         except Exception:
+            # Collection does not exist — create it with default vector config
             logger.info(f"Creating collection {self.collection_name}")
             self.client.create_collection(
                 collection_name=self.collection_name,
@@ -76,7 +77,7 @@ class QdrantVectorStore:
             return True
             
         except Exception as e:
-            logger.error(f"Failed to upsert vectors to Qdrant: {e}")
+            logger.error(f"Failed to upsert vectors to Qdrant: {e}", exc_info=True)
             return False
     
     def search_similar(
@@ -125,7 +126,7 @@ class QdrantVectorStore:
             ]
             
         except Exception as e:
-            logger.error(f"Failed to search Qdrant: {e}")
+            logger.error(f"Failed to search Qdrant: {e}", exc_info=True)
             return []
     
     def get_collection_info(self) -> Dict[str, Any]:
@@ -140,7 +141,7 @@ class QdrantVectorStore:
                 "ram_data_size": info.ram_data_size
             }
         except Exception as e:
-            logger.error(f"Failed to get collection info: {e}")
+            logger.error(f"Failed to get collection info: {e}", exc_info=True)
             return {}
     
     def delete_vectors(self, ids: List[str]) -> bool:
@@ -153,7 +154,7 @@ class QdrantVectorStore:
             logger.info(f"Successfully deleted {len(ids)} vectors from Qdrant")
             return True
         except Exception as e:
-            logger.error(f"Failed to delete vectors from Qdrant: {e}")
+            logger.error(f"Failed to delete vectors from Qdrant: {e}", exc_info=True)
             return False
 
 

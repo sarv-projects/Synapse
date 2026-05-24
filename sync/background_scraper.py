@@ -84,7 +84,7 @@ async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
     try:
         from embedding.generator import get_embedding_generator
         from embedding.qdrant_client import get_qdrant_client
-        gen = get_embedding_generator()
+        gen = await get_embedding_generator()
         vector = gen.generate_entity_embedding(title, content[:512])
         qdrant = get_qdrant_client()
         results = qdrant.search_similar(vector, limit=1, score_threshold=0.92)
@@ -99,16 +99,14 @@ async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
 async def _store_in_neo4q(title: str, content: str, url: str, source_type: str):
     """Store verified content as BackgroundContent node in Neo4j."""
     try:
-        from ingestion.neo4j.client import Neo4jClient
-        from schema.config import get_settings
-        client = Neo4jClient.from_settings(get_settings())
+        from ingestion.neo4j.client import get_neo4j_client
+        client = await get_neo4j_client()
         async with client.session() as s:
             await s.run("""
                 MERGE (bc:BackgroundContent {source_url: $url})
                 SET bc.title = $title, bc.content_md = $content, bc.source_type = $type,
                     bc.scraped_at = datetime(), bc.status = 'active', bc.verified = true
             """, url=url, title=title, content=content[:10000], type=source_type)
-        await client.close()
     except Exception as e:
         logger.debug(f"Neo4j storage skipped: {e}")
 

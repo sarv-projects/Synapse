@@ -73,11 +73,14 @@ class CircuitBreakerRegistry:
     def _load_state(self):
         import os
         import json
+        import logging
+        logger = logging.getLogger(__name__)
         if not os.path.exists(self.state_path):
             return
+        f = None
         try:
-            with open(self.state_path, "r") as f:
-                data = json.load(f)
+            f = open(self.state_path, "r")
+            data = json.load(f)
             for name, item in data.items():
                 breaker = CircuitBreaker(
                     failure_threshold=item.get("failure_threshold", 3),
@@ -90,11 +93,20 @@ class CircuitBreakerRegistry:
                 if lft:
                     breaker.last_failure_time = datetime.fromisoformat(lft)
                 self.breakers[name] = breaker
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to load circuit breaker state from {self.state_path}: {e}", exc_info=True)
+        finally:
+            if f:
+                f.close()
 
     def _save_state(self):
         import json
+        import os
+        import fcntl
+        import logging
+        logger = logging.getLogger(__name__)
+        lock_file = None
+        temp_f = None
         try:
             data = {}
             for name, breaker in self.breakers.items():
@@ -105,10 +117,25 @@ class CircuitBreakerRegistry:
                     "failure_threshold": breaker.failure_threshold,
                     "timeout_seconds": int(breaker.timeout.total_seconds())
                 }
-            with open(self.state_path, "w") as f:
-                json.dump(data, f, indent=2)
-        except Exception:
-            pass
+
+            temp_path = f"{self.state_path}.tmp"
+            lock_file = open(self.state_path, "a+")
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
+            try:
+                temp_f = open(temp_path, "w")
+                json.dump(data, temp_f, indent=2)
+                temp_f.close()
+                temp_f = None
+                os.replace(temp_path, self.state_path)
+            finally:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+        except Exception as e:
+            logger.error(f"Failed to save circuit breaker state to {self.state_path}: {e}", exc_info=True)
+        finally:
+            if lock_file:
+                lock_file.close()
+            if temp_f:
+                temp_f.close()
     
     def get_breaker(self, source_name: str) -> CircuitBreaker:
         """Get or create circuit breaker for source."""

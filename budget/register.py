@@ -40,7 +40,7 @@ class ModelBudget:
         self.rpm_remaining = self.rpm_limit
         self.rpd_remaining = self.rpd_limit
         self.tpm_remaining = self.tpm_limit
-        self.tpd_remaining = self.tpd_limit  # type: ignore[attr-defined]
+        self.tpd_remaining = self.tpd_limit
 
     @property
     def tpd_limit(self) -> int:

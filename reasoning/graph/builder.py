@@ -57,9 +57,13 @@ class GraphBuilder:
                 state.status = "FAILED"
                 state.error = f"Budget exhausted for {model_id}"
                 return state
-            result = await func(state)
-            oracle.record_usage(model_id, estimated)
-            return result
+            
+            try:
+                result = await func(state)
+                return result
+            finally:
+                oracle.release_reservation(model_id, estimated)
+
         return wrapped
 
     def build(self) -> StateGraph:

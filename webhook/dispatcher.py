@@ -213,6 +213,7 @@ class WebhookDispatcher:
                 
             except Exception as e:
                 error_msg = str(e)
+                logger.error(f"Webhook delivery failed for {subscription.endpoint_url}: {e}", exc_info=True)
                 await self._log_delivery_failure(delivery_id, error_msg, attempt)
                 return {"success": False, "error": error_msg}
         
@@ -241,7 +242,7 @@ class WebhookDispatcher:
                     status="attempted"
                 )
             except Exception as e:
-                logger.error(f"Failed to log delivery attempt: {e}")
+                logger.error(f"Failed to log delivery attempt: {e}", exc_info=True)
     
     async def _log_delivery_success(self, delivery_id: str, status_code: int):
         """Log successful webhook delivery."""
@@ -253,7 +254,7 @@ class WebhookDispatcher:
                     response_code=status_code
                 )
             except Exception as e:
-                logger.error(f"Failed to log delivery success: {e}")
+                logger.error(f"Failed to log delivery success: {e}", exc_info=True)
     
     async def _log_delivery_failure(self, delivery_id: str, error_msg: str, attempt: int):
         """Log failed webhook delivery."""
@@ -266,7 +267,7 @@ class WebhookDispatcher:
                     attempt=attempt
                 )
             except Exception as e:
-                logger.error(f"Failed to log delivery failure: {e}")
+                logger.error(f"Failed to log delivery failure: {e}", exc_info=True)
     
     async def get_delivery_stats(self, hours: int = 24) -> Dict[str, Any]:
         """Get webhook delivery statistics for the last N hours."""
@@ -279,7 +280,7 @@ class WebhookDispatcher:
             since = datetime.now(UTC) - timedelta(hours=hours)
             return await self.checkpoint.get_webhook_delivery_stats(since)
         except Exception as e:
-            logger.error(f"Failed to get delivery stats: {e}")
+            logger.error(f"Failed to get delivery stats: {e}", exc_info=True)
             return {"error": str(e)}
     
     async def cleanup_old_deliveries(self, days: int = 30):
@@ -294,7 +295,7 @@ class WebhookDispatcher:
             deleted = await self.checkpoint.cleanup_webhook_deliveries(cutoff)
             logger.info(f"Cleaned up {deleted} old webhook delivery logs")
         except Exception as e:
-            logger.error(f"Failed to cleanup old deliveries: {e}")
+            logger.error(f"Failed to cleanup old deliveries: {e}", exc_info=True)
     
     async def close(self):
         """Close the HTTP client."""
