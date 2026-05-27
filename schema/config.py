@@ -27,7 +27,7 @@ class Settings(BaseModel):
     qdrant_api_key: str = Field(default="")
 
     # API & Security
-    synapse_admin_key: str = Field(default=...)
+    synapse_admin_key: str = Field(default="")
     api_version: str = Field(default="v1")
     cors_origins: list[str] = Field(default=...)
     x_content_type_options: str = Field(default="nosniff")
@@ -55,9 +55,7 @@ class Settings(BaseModel):
         if not neo4j_uri:
             raise ValueError("NEO4J_URI environment variable is required")
 
-        synapse_admin_key = os.getenv("SYNAPSE_ADMIN_KEY")
-        if not synapse_admin_key:
-            raise ValueError("SYNAPSE_ADMIN_KEY environment variable is required")
+        synapse_admin_key = os.getenv("SYNAPSE_ADMIN_KEY", "")
 
         groq_models_raw = os.getenv("GROQ_MODELS_ENABLED", "")
         groq_models_enabled = (

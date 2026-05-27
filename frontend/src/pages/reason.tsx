@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import DOMPurify from 'dompurify'
 
 interface ResultType {
   markdown?: string
@@ -196,5 +197,5 @@ function renderMarkdown(md: string): string {
     }).join('')
     return `<table class="border-collapse border border-slate-600 my-2 text-sm"><thead><tr>${hcols}</tr></thead><tbody>${rrows}</tbody></table>`
   })
-  return html
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['h2', 'h3', 'p', 'br', 'strong', 'em', 'code', 'pre', 'li', 'ul', 'ol', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'span'], ALLOWED_ATTR: ['class', 'href', 'target', 'rel'] })
 }

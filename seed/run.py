@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 
 from ingestion.generic_source import GenericSourceFetcher, SourceConfig
 from ingestion.sources.base import SourceDocument
-from ingestion.pipeline.run import run_pipeline
 from schema.config import get_settings
 
 
@@ -80,8 +79,25 @@ async def main_async(days: int) -> None:
 
     print()
 
-    summary = await run_pipeline(domain="ai")
-    print(f"\nSeed complete — {summary.get('nodes_written', 0)} nodes written to Neo4j")
+    # Use the pipeline's extraction + write stages directly with seed docs
+    from ingestion.pipeline.extraction import fast_path_transform
+    from ingestion.pipeline.relationships import extract_relationships
+    from ingestion.pipeline.state import PipelineState
+    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.writer import merge_nodes, merge_edges
+
+    state = PipelineState(documents=docs)
+    state = fast_path_transform(state)
+    state = extract_relationships(state)
+
+    neo4j = Neo4jClient.from_settings(settings)
+    try:
+        written = await merge_nodes(neo4j, state.nodes)
+        edges_written = await merge_edges(neo4j, state.edges)
+    finally:
+        await neo4j.close()
+
+    print(f"\nSeed complete — {written} nodes, {edges_written} edges written to Neo4j")
 
 
 def main() -> None:

@@ -54,8 +54,7 @@ def _gate2_domain_relevance(content: str, url: str) -> bool:
 
 
 def _gate3_spam(title: str, content: str, url: str) -> bool:
-    title_upper = title.upper()
-    cap_ratio = sum(1 for c in title_upper if c.isupper()) / max(1, len(title))
+    cap_ratio = sum(1 for c in title if c.isupper()) / max(1, len(title))
     if cap_ratio > 0.3:
         _log_reject(f"Excessive ALL CAPS: {cap_ratio:.2f}", url, 3)
         return False

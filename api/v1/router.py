@@ -13,6 +13,12 @@ router = APIRouter(prefix="/api/v1")
 router.include_router(groq_status.router)
 
 
+async def _get_client():
+    """Get the shared Neo4j client singleton (connection pooled)."""
+    from ingestion.neo4j.client import get_neo4j_client
+    return await get_neo4j_client()
+
+
 @router.get("/health")
 async def health():
     """Health check endpoint — includes live Neo4j node/edge counts."""
@@ -21,7 +27,7 @@ async def health():
 
     result = {
         "status": "healthy",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "service": "SYNAPSE",
         "total_nodes": 0,
         "total_edges": 0,
@@ -116,7 +122,10 @@ async def search(
     settings = get_settings()
     client = Neo4jClient.from_settings(settings)
 
+    ALLOWED_LABELS = {"Paper", "Model", "Tool", "Author", "Organization", "Technique", "Dataset", "Benchmark", "Space"}
     try:
+        if type and type != "all" and type not in ALLOWED_LABELS:
+            raise HTTPException(status_code=400, detail=f"Invalid type filter. Allowed: {', '.join(sorted(ALLOWED_LABELS))}")
         label_filter = f":{type}" if type and type != "all" else ""
 
         cypher = f"""

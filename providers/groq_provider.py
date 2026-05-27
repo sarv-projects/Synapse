@@ -49,7 +49,7 @@ class GroqProvider(InferenceProvider):
                 choice = response.choices[0]
                 usage = response.usage
 
-                await manager._record_usage(key.api_key, success=True)
+                await manager._record_usage(key.api_key, success=True, tokens_used=(usage.prompt_tokens + usage.completion_tokens) if usage else 0)
 
                 return InferenceResult(
                     content=choice.message.content or "",
@@ -111,6 +111,23 @@ class GroqProvider(InferenceProvider):
                 raise
 
         if stream:
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            import asyncio
+            import queue
+
+            q: queue.Queue[str | None] = queue.Queue()
+
+            def _consume():
+                try:
+                    for chunk in stream:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            q.put(chunk.choices[0].delta.content)
+                finally:
+                    q.put(None)
+
+            task = asyncio.get_event_loop().run_in_executor(None, _consume)
+            while True:
+                item = await asyncio.to_thread(q.get)
+                if item is None:
+                    break
+                yield item
+            await task

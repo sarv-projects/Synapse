@@ -125,7 +125,7 @@ class EmbeddingPipeline:
         embedding_vectors = []
         for entity in entities:
             try:
-                vector = self._generate_embedding_for_entity(entity)
+                vector = await asyncio.to_thread(self._generate_embedding_for_entity, entity)
                 if vector:
                     embedding_vectors.append({
                         "entity": entity,

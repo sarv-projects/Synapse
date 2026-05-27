@@ -289,7 +289,7 @@ class GroqKeyManager:
         
         raise Exception(f"All Groq API keys failed after {max_retries} attempts")
     
-    async def _record_usage(self, api_key: str, success: bool):
+    async def _record_usage(self, api_key: str, success: bool, tokens_used: int = 0):
         """Record usage for a specific key."""
         key = self._find_key_by_api_key(api_key)
         if not key:
@@ -298,7 +298,7 @@ class GroqKeyManager:
         key.last_used = datetime.now(UTC)
         
         if success:
-            key.current_tpm += 1
+            key.current_tpm += max(tokens_used, 1)
             key.error_count = 0
             key.status = KeyStatus.ACTIVE
         else:

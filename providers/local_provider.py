@@ -1,4 +1,4 @@
-"""LocalProvider — zero-API-cost fallback (spaCy, BM25, rule-based)."""
+"""LocalProvider — zero-API-cost fallback (spaCy NER, BM25, extractive)."""
 import logging
 from typing import AsyncIterator
 
@@ -16,8 +16,27 @@ class LocalProvider(InferenceProvider):
         self.model_id = model_id
 
     async def generate(self, prompt: AssembledPrompt, config: InferenceConfig) -> InferenceResult:
-        content = prompt.to_string()
-        result_text = f"[LOCAL FALLBACK] Unable to process: {content[:200]}..."
+        """Use BM25 retrieval context to produce an extractive summary."""
+        task = prompt.task or prompt.to_string()
+        context_texts = [c.get("content", "") if isinstance(c, dict) else str(c) for c in (prompt.context or [])]
+
+        if context_texts:
+            # Extractive: return the most relevant context passages
+            from rank_bm25 import BM25Okapi
+            import re
+
+            def tokenize(t: str) -> list[str]:
+                return re.findall(r"[a-z0-9]+", t.lower())
+
+            corpus = [tokenize(t) for t in context_texts]
+            bm25 = BM25Okapi(corpus)
+            scores = bm25.get_scores(tokenize(task))
+            ranked = sorted(zip(scores, context_texts), key=lambda x: x[0], reverse=True)
+            top_passages = [text for _, text in ranked[:3] if text.strip()]
+            result_text = "\n\n".join(top_passages) if top_passages else "[LOCAL] No relevant context found."
+        else:
+            result_text = "[LOCAL FALLBACK] No API budget available and no context provided."
+
         return InferenceResult(
             content=result_text,
             input_tokens_used=0,
@@ -27,4 +46,5 @@ class LocalProvider(InferenceProvider):
         )
 
     async def stream(self, prompt: AssembledPrompt, config: InferenceConfig) -> AsyncIterator[str]:
-        yield "[LOCAL FALLBACK] Streaming not supported.\n"
+        result = await self.generate(prompt, config)
+        yield result.content

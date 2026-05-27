@@ -191,7 +191,10 @@ class GenericSourceFetcher(SourceFetcher):
 
     async def _fetch_rss(self) -> List[SourceDocument]:
         try:
-            feed = feedparser.parse(self.config.base_url)
+            import asyncio
+            response = await self.client.get(self.config.base_url)
+            response.raise_for_status()
+            feed = await asyncio.to_thread(feedparser.parse, response.text)
             return [d for d in (self._create_document_from_rss(entry) for entry in feed.entries) if d]
         except Exception as e:
             logger.error(f"RSS fetch failed for {self.config.name}: {e}")

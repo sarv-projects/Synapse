@@ -156,71 +156,56 @@ class WebhookDispatcher:
         return stats
     
     async def _dispatch_to_subscription(self, subscription, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Dispatch event to a specific subscription with retry logic."""
+        """Dispatch event to a subscription. Retries happen in background (non-blocking)."""
         payload = json.dumps(event, default=str)
         signature = self._generate_signature(payload, subscription.secret_token)
-        
+
         headers = {
             "X-SYNAPSE-Signature": signature,
             "X-SYNAPSE-Event": event["event"],
             "Content-Type": "application/json",
-            "User-Agent": "SYNAPSE-Webhook/3.0"
+            "User-Agent": "SYNAPSE-Webhook/4.0"
         }
-        
-        # Check delivery history
+
         delivery_id = f"{subscription.id}_{event['event']}_{event.get('entity_id', 'unknown')}"
-        
-        for attempt in range(self.max_retries + 1):
-            try:
-                # Log delivery attempt
-                await self._log_delivery_attempt(delivery_id, subscription.id, event["event"], attempt)
-                
-                response = await self.client.post(
-                    subscription.endpoint_url,
-                    data=payload,
-                    headers=headers,
-                    timeout=30.0
+
+        try:
+            await self._log_delivery_attempt(delivery_id, subscription.id, event["event"], 0)
+            response = await self.client.post(
+                subscription.endpoint_url, data=payload, headers=headers, timeout=30.0
+            )
+            if response.status_code in [200, 201, 202, 204]:
+                await self._log_delivery_success(delivery_id, response.status_code)
+                return {"success": True}
+
+            if response.status_code in [429, 500, 502, 503, 504]:
+                asyncio.create_task(
+                    self._retry_in_background(subscription, payload, headers, delivery_id)
                 )
-                
+                return {"success": False, "error": f"HTTP {response.status_code}, retrying in background"}
+
+            error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+            await self._log_delivery_failure(delivery_id, error_msg, 0)
+            return {"success": False, "error": error_msg}
+        except Exception as e:
+            await self._log_delivery_failure(delivery_id, str(e), 0)
+            return {"success": False, "error": str(e)}
+
+    async def _retry_in_background(self, subscription, payload: str, headers: dict, delivery_id: str):
+        """Background retry with exponential backoff — does not block dispatch."""
+        for attempt in range(1, self.max_retries + 1):
+            delay = self.retry_delays[min(attempt - 1, len(self.retry_delays) - 1)]
+            await asyncio.sleep(delay)
+            try:
+                response = await self.client.post(
+                    subscription.endpoint_url, data=payload, headers=headers, timeout=30.0
+                )
                 if response.status_code in [200, 201, 202, 204]:
-                    # Success
                     await self._log_delivery_success(delivery_id, response.status_code)
-                    return {"success": True}
-                
-                # HTTP error - check if retryable
-                if response.status_code in [429, 500, 502, 503, 504]:
-                    if attempt < self.max_retries:
-                        delay = self.retry_delays[min(attempt, len(self.retry_delays) - 1)]
-                        logger.warning(f"Webhook delivery attempt {attempt + 1} failed with {response.status_code}, retrying in {delay}s")
-                        await asyncio.sleep(delay)
-                        continue
-                
-                # Non-retryable error
-                error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
-                await self._log_delivery_failure(delivery_id, error_msg, attempt)
-                return {"success": False, "error": error_msg}
-                
-            except httpx.TimeoutException:
-                if attempt < self.max_retries:
-                    delay = self.retry_delays[min(attempt, len(self.retry_delays) - 1)]
-                    logger.warning(f"Webhook timeout on attempt {attempt + 1}, retrying in {delay}s")
-                    await asyncio.sleep(delay)
-                    continue
-                
-                error_msg = "Request timeout"
-                await self._log_delivery_failure(delivery_id, error_msg, attempt)
-                return {"success": False, "error": error_msg}
-                
+                    return
             except Exception as e:
-                error_msg = str(e)
-                logger.error(f"Webhook delivery failed for {subscription.endpoint_url}: {e}", exc_info=True)
-                await self._log_delivery_failure(delivery_id, error_msg, attempt)
-                return {"success": False, "error": error_msg}
-        
-        # All retries failed
-        error_msg = f"Failed after {self.max_retries + 1} attempts"
-        await self._log_delivery_failure(delivery_id, error_msg, self.max_retries)
-        return {"success": False, "error": error_msg}
+                logger.debug(f"Webhook retry {attempt} failed for {delivery_id}: {e}")
+        await self._log_delivery_failure(delivery_id, "All retries exhausted", self.max_retries)
     
     def _generate_signature(self, payload: str, secret: str) -> str:
         """Generate HMAC-SHA256 signature for webhook payload."""

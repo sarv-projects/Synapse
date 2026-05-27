@@ -102,14 +102,7 @@ _EDGE_DEDUP_KEY: dict[str, str] = {
 _EDGE_TMPL = """
 UNWIND $rows AS row
 MATCH (a:{from_label}) WHERE a.{from_key} = row.from_val
-    OR a.full_name = row.from_val
-    OR a.name = row.from_val
-    OR a.id = row.from_val
-    OR a.hf_model_id = row.from_val
 MATCH (b:{to_label}) WHERE b.{to_key} = row.to_val
-    OR b.full_name = row.to_val
-    OR b.name = row.to_val
-    OR b.canonical_name = row.to_val
 MERGE (a)-[r:{rel_type}]->(b)
 ON CREATE SET r += row.props, r.created_at = timestamp()
 ON MATCH  SET r.last_seen = timestamp()

@@ -45,7 +45,7 @@ class HybridRetrievalEngine:
             from embedding.qdrant_client import get_qdrant_client
             import qdrant_client
 
-            embed_model = HuggingFaceEmbedding(model_name="thenlper/gte-small")
+            embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
             Settings.embed_model = embed_model
 
             qdrant = get_qdrant_client()

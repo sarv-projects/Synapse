@@ -247,10 +247,13 @@ async def get_reason_result(job_id: str, format: str | None = Query(default=None
 @reasoning_router.post("/ingest")
 async def ingest_document(file: UploadFile = File(...), session_id: str | None = Form(default=None)):
     """Upload a document for session-scoped indexing."""
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
     doc_id = str(uuid.uuid4())
     sid = session_id or str(uuid.uuid4())
 
-    content = await file.read()
+    content = await file.read(MAX_FILE_SIZE + 1)
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)} MB")
     try:
         text = content.decode("utf-8")[:50000]
     except UnicodeDecodeError:

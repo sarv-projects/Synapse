@@ -1,14 +1,23 @@
 """Groq API key management and rotation status endpoints."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from datetime import datetime, timezone
 import logging
 
 from api.groq_manager import get_groq_manager
+from schema.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 # No prefix here — this router is included under /api/v1 by the parent router
 router = APIRouter(prefix="/groq", tags=["groq"])
+
+
+def _verify_admin(authorization: str | None):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    settings = get_settings()
+    if authorization != f"Bearer {settings.synapse_admin_key}":
+        raise HTTPException(status_code=403, detail="Invalid admin key")
 
 
 @router.get("/status")
@@ -39,8 +48,9 @@ async def get_model_status():
 
 
 @router.get("/rotate")
-async def force_rotation():
-    """Force rotation to next available key."""
+async def force_rotation(authorization: str | None = Header(default=None)):
+    """Force rotation to next available key (admin only)."""
+    _verify_admin(authorization)
     manager = get_groq_manager()
     manager.current_key_index = (manager.current_key_index + 1) % max(len(manager.keys), 1)
     return {
@@ -51,8 +61,9 @@ async def force_rotation():
 
 
 @router.post("/reset")
-async def reset_key_limits():
-    """Reset all key TPM limits."""
+async def reset_key_limits(authorization: str | None = Header(default=None)):
+    """Reset all key TPM limits (admin only)."""
+    _verify_admin(authorization)
     manager = get_groq_manager()
     await manager.reset_hourly_limits()
     return {

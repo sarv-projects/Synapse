@@ -16,8 +16,9 @@ _circuit_registry = CircuitBreakerRegistry()
 class CircuitBreakerWrapper:
     """Wrapper that adds circuit breaker functionality to any fetcher."""
 
-    def __init__(self, fetcher):
+    def __init__(self, fetcher, _use_raw_fetch: bool = False):
         self.fetcher = fetcher
+        self._use_raw_fetch = _use_raw_fetch
         source_name = getattr(getattr(fetcher, "manifest", None), "name", None) \
                       or getattr(getattr(fetcher, "config", None), "name", None) \
                       or getattr(fetcher, "source_name", "unknown")
@@ -45,15 +46,15 @@ class CircuitBreakerWrapper:
         
         for attempt in range(max_retries + 1):
             try:
+                # If wrapping a ProtectedFetcher, call the raw parent fetch
+                if self._use_raw_fetch and hasattr(self.fetcher, '_raw_fetch'):
+                    return await self.fetcher._raw_fetch()
                 return await self.fetcher.fetch()
             except Exception as e:
                 if attempt == max_retries:
                     raise
-                
-                # Check if error is retryable
                 if not self._is_retryable_error(e):
                     raise
-                
                 delay = base_delay * (2 ** attempt)
                 logger.warning(f"Attempt {attempt + 1} failed for {self.source_name}, retrying in {delay}s: {e}")
                 await asyncio.sleep(delay)
@@ -94,7 +95,11 @@ def circuit_breaker_protected(fetcher_class: type) -> type:
     class ProtectedFetcher(fetcher_class):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self._circuit_wrapper = CircuitBreakerWrapper(self)
+            self._circuit_wrapper = CircuitBreakerWrapper(self, _use_raw_fetch=True)
+        
+        async def _raw_fetch(self) -> List[SourceDocument]:
+            """Call the original parent fetch (bypasses circuit breaker)."""
+            return await super().fetch()
         
         async def fetch(self) -> List[SourceDocument]:
             return await self._circuit_wrapper.fetch()

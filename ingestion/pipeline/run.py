@@ -33,11 +33,17 @@ logger = logging.getLogger(__name__)
 
 def _nodes_to_dicts(nodes: list) -> list[dict]:
     """Convert GraphNode objects to plain dicts for embedding pipeline."""
+    from ingestion.neo4j.writer import _dedup_key_for
+
     dicts = []
     for node in nodes:
         d = dict(node.properties) if hasattr(node, "properties") else {}
-        d["id"] = getattr(node, "id", "")
-        d["entity_type"] = node.label if hasattr(node, "label") else ""
+        # Use the natural dedup key (same as Neo4j MERGE key) as embedding ID
+        label = node.label if hasattr(node, "label") else ""
+        key_prop = _dedup_key_for(label)
+        natural_id = (node.properties.get(key_prop) or node.properties.get("name") or node.key) if hasattr(node, "properties") else ""
+        d["id"] = str(natural_id)
+        d["entity_type"] = label
         d["source"] = node.source if hasattr(node, "source") else "unknown"
         dicts.append(d)
     return dicts
@@ -59,6 +65,17 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
     t0 = time.perf_counter()
 
     logger.info(f"=== SYNAPSE ingestion pipeline starting — domain={domain} ===")
+
+    # ── Initialize checkpoint (optional) ────────────────────────────────────
+    checkpoint = None
+    try:
+        if settings.postgres_url:
+            from ingestion.checkpoint.postgres import PostgresCheckpoint
+            checkpoint = PostgresCheckpoint()
+            await checkpoint.connect()
+            logger.info("Checkpoint store connected")
+    except Exception as e:
+        logger.warning(f"Checkpoint unavailable (pipeline will run without persistence): {e}")
 
     # ── Stage 1: Load source factory ────────────────────────────────────────
     factory = SourceFactory()

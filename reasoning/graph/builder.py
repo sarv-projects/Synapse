@@ -48,14 +48,14 @@ class GraphBuilder:
             
             # Dynamically adjust conservative estimate based on query factor
             estimated = estimated_tokens
-            if hasattr(state, "query") and state.query:
-                query_factor = min(2.0, max(0.5, len(state.query) / 300.0))
+            if state.get("query"):
+                query_factor = min(2.0, max(0.5, len(state["query"]) / 300.0))
                 estimated = int(estimated * query_factor)
 
             allowed, _ = await oracle.gate(model_id, estimated)
             if not allowed:
-                state.status = "FAILED"
-                state.error = f"Budget exhausted for {model_id}"
+                state["status"] = "FAILED"
+                state["error"] = f"Budget exhausted for {model_id}"
                 return state
             
             try:
@@ -63,6 +63,7 @@ class GraphBuilder:
                 return result
             finally:
                 oracle.release_reservation(model_id, estimated)
+                oracle.scheduler.release(model_id)
 
         return wrapped
 
@@ -193,7 +194,7 @@ class GraphBuilder:
                 left = right
             return True
         if isinstance(node, ast.Name):
-            return getattr(state, node.id)
+            return state.get(node.id)
         if isinstance(node, ast.Constant):
             return node.value
         raise ValueError(f"Unsupported graph condition expression: {ast.dump(node)}")

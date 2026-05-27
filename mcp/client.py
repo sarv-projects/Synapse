@@ -3,7 +3,6 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -23,9 +22,7 @@ class MCPStdioClient:
         self.name = name
         self.command = command
         self.env = env or {}
-        self._process: subprocess.Popen | None = None
-        self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
+        self._process: asyncio.subprocess.Process | None = None
         self._tools: dict[str, dict[str, Any]] = {}
         self._connected = False
 
@@ -35,17 +32,12 @@ class MCPStdioClient:
             return False
         try:
             full_env = {**os.environ, **self.env}
-            self._process = subprocess.Popen(
-                self.command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+            self._process = await asyncio.create_subprocess_exec(
+                *self.command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
                 env=full_env,
-            )
-            loop = asyncio.get_event_loop()
-            self._reader = asyncio.StreamReader(loop=loop)
-            self._writer = asyncio.StreamWriter(
-                self._process.stdin, None, self._reader, loop
             )
             await self._initialize()
             self._connected = True
@@ -65,15 +57,13 @@ class MCPStdioClient:
             self._tools = {t["name"]: t for t in tools}
 
     async def _send_request(self, request_str: str) -> dict | None:
-        if not self._writer or not self._process or not self._process.stdout:
+        if not self._process or not self._process.stdin or not self._process.stdout:
             return None
         try:
-            self._writer.write((request_str + "\n").encode())
-            await self._writer.drain()
+            self._process.stdin.write((request_str + "\n").encode())
+            await self._process.stdin.drain()
             line = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(
-                    None, self._process.stdout.readline
-                ),
+                self._process.stdout.readline(),
                 timeout=10.0,
             )
             if line:
@@ -105,8 +95,8 @@ class MCPStdioClient:
         if self._process:
             self._process.terminate()
             try:
-                self._process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
+                await asyncio.wait_for(self._process.wait(), timeout=5)
+            except asyncio.TimeoutError:
                 self._process.kill()
         self._connected = False
 

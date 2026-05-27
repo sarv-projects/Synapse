@@ -20,7 +20,8 @@ class NLToCypherTranslator:
         self.neo4j_client = None
         self.groq_manager = None
         self.schema_cache = None
-        self.query_cache = {}
+        self.query_cache: dict[str, Any] = {}
+        self._cache_max_size = 256
         
         # Safety patterns for Cypher injection prevention
         self.forbidden_keywords = {
@@ -170,6 +171,11 @@ class NLToCypherTranslator:
             
             # Cache the result
             if use_cache:
+                if len(self.query_cache) >= self._cache_max_size:
+                    # Evict oldest half
+                    keys = list(self.query_cache.keys())
+                    for k in keys[: len(keys) // 2]:
+                        del self.query_cache[k]
                 self.query_cache[cache_key] = response
             
             return response
@@ -229,32 +235,32 @@ TASK: Convert this natural language question to a Cypher query:
 Respond with ONLY the Cypher query, no explanations, no markdown fences."""
 
         try:
-            manager = get_groq_manager()
+            from providers.groq_provider import GroqProvider
+            from providers.protocol import AssembledPrompt, InferenceConfig
 
-            # Get best client and model for NL-to-Cypher (complex reasoning)
-            client, model = await manager.get_best_client_for_task("complex_reasoning")
-            
-            # Call Groq API with selected model
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are an expert Cypher query generator for a knowledge graph about AI research."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=500,
-                temperature=0.1
+            manager = get_groq_manager()
+            model = manager.get_best_model_for_task("complex_reasoning")
+
+            provider = GroqProvider(model_id=model)
+            assembled = AssembledPrompt(
+                system="You are an expert Cypher query generator for a knowledge graph about AI research.",
+                context=[],
+                tools=[],
+                task=prompt,
             )
-            
-            cypher_query = response.choices[0].message.content.strip()
-            
+            config = InferenceConfig(max_tokens=500, temperature=0.1)
+            result = await provider.generate(assembled, config)
+
+            cypher_query = result.content.strip()
+
             # Clean up the response
             cypher_query = re.sub(r'```cypher\s*', '', cypher_query)
             cypher_query = re.sub(r'```\s*$', '', cypher_query)
             cypher_query = cypher_query.strip()
-            
+
             logger.info(f"Generated Cypher: {cypher_query}")
             return cypher_query
-            
+
         except Exception as e:
             logger.error(f"Failed to generate Cypher with Llama 4 Scout: {e}")
             return None
