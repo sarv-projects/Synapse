@@ -19,7 +19,7 @@ sources:
 
   - name: huggingface_daily_papers
     type: rss
-    base_url: https://huggingface.co/papers/rss
+    base_url: https://raw.githubusercontent.com/huangboming/huggingface-daily-paper-feed/refs/heads/main/feed.xml
     rate_limit:
       requests_per_hour: 1000
     auth_required: false
@@ -116,6 +116,80 @@ sources:
     auth_required: false
     entity_coverage:
       - Paper
+
+  - name: towards_data_science
+    type: rss
+    base_url: https://towardsdatascience.com/feed
+    rate_limit:
+      requests_per_hour: 200
+    auth_required: false
+    entity_coverage:
+      - Technique
+      - Tool
+
+  - name: openai_blog
+    type: rss
+    base_url: https://openai.com/blog/feed.xml
+    rate_limit:
+      requests_per_hour: 200
+    auth_required: false
+    entity_coverage:
+      - Model
+      - Technique
+
+  - name: huggingface_blog
+    type: rss
+    base_url: https://huggingface.co/blog/feed.xml
+    rate_limit:
+      requests_per_hour: 200
+    auth_required: false
+    entity_coverage:
+      - Model
+      - Tool
+
+  - name: huggingface_trending_datasets
+    type: rest_json
+    base_url: https://huggingface.co/api/datasets
+    rate_limit:
+      requests_per_hour: 1000
+    auth_required: false
+    auth_env_var: HF_TOKEN
+    entity_coverage:
+      - Tool
+    fetch_params:
+      sort: downloads
+      direction: -1
+      limit: 50
+
+  - name: marktechpost
+    type: rss
+    base_url: https://www.marktechpost.com/feed/
+    rate_limit:
+      requests_per_hour: 200
+    auth_required: false
+    entity_coverage:
+      - Paper
+      - Tool
+  - name: openalex
+    type: rest_json
+    base_url: https://api.openalex.org/works
+    rate_limit:
+      requests_per_second: 2
+    auth_required: false
+    entity_coverage:
+      - Paper
+    headers:
+      User-Agent: "mailto:sarvesh@synapse-nexus-ai.org"
+    fetch_params:
+      filter: "concepts.id:C41008148"
+      sort: "cited_by_count:desc"
+      per_page: 30
+    pagination:
+      strategy: "offset_limit"
+      limit_param: "per_page"
+      offset_param: "page"
+      max_pages: 3
+      page_delay: 2.0
 
 # Source priority for conflict resolution
 source_priority:

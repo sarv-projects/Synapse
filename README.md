@@ -1,5 +1,5 @@
 # 🌐 SYNAPSE v4.0.0
-> **Systematic, Networked, Yet Natural, Automated, Provenance-aware Schema Engine**
+> **AI Knowledge Graph & Reasoning Engine**
 
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -16,9 +16,10 @@ No login required. Fully open-access.
 
 ## 🌟 What SYNAPSE Helps You Do
 
-*   🔍 **Track the AI Ecosystem in Near Real-Time:** Automatically ingests new models, papers, and repositories every day, mapping how concepts like LoRA or Mixture-of-Experts evolve.
+*   🔍 **Track the AI Ecosystem in Near Real-Time:** Automatically ingests new models, papers, and repositories every day, tracking 10K+ entities across **15 curated daily APIs** (mapping how concepts like LoRA or Mixture-of-Experts evolve).
 *   🧠 **Hallucination-Free Deep Research:** Ground-truths LLM generation by translating natural language queries directly into validated Neo4j Cypher and pgvector queries, returning responses with verifiable source citations and strict provenance scores.
-*   📊 **Cross-Model Synthesis & Critique:** Coordinates an orchestrator that runs parallel analysis subagents and self-critiques synthesis reports before rendering, automatically escalating task capabilities up to GPT-OSS 120B on complex queries.
+*   ⚡ **Zero-Latency Semantic Caching:** Bypasses LangGraph and Groq API calls entirely using a native `pgvector` semantic cache, delivering instant resolutions for structurally similar queries (`> 0.95` cosine similarity).
+*   📊 **Cross-Model Synthesis & Critique:** Coordinates an orchestrator that runs parallel analysis subagents (CrewAI Contradiction Detector) and self-critiques synthesis reports, escalating task capabilities up to GPT-OSS 120B on complex queries.
 *   💵 **Serverless Zero-Cost Orchestration:** Operates on stacked free-tier resources (Neo4j Aura, Neon pgvector, GCP Firestore, AWS DynamoDB/SQS, and Groq API developer keys) kept active via automated keep-alive cron triggers.
 
 ---
@@ -28,7 +29,7 @@ No login required. Fully open-access.
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#e0e7ff', 'primaryTextColor': '#1e1b4b', 'primaryBorderColor': '#6366f1', 'lineColor': '#6366f1', 'secondaryColor': '#f0fdf4', 'tertiaryColor': '#f0f9ff', 'background': '#ffffff', 'mainBkg': '#ffffff', 'nodeBorder': '#6366f1', 'clusterBkg': '#f8fafc', 'clusterBorder': '#e2e8f0', 'titleColor': '#1e1b4b', 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart TD
-    subgraph Sources["Data Sources (9 Curated Daily APIs)"]
+    subgraph Sources["Data Sources (15 Curated Daily APIs)"]
         A1[arXiv API]
         A2[HuggingFace Hub]
         A3[HuggingFace Trending]
@@ -37,7 +38,7 @@ flowchart TD
         A6[Papers With Code]
         A7[GitHub Search]
         A8[GitHub Trending]
-        A9[DAIR.AI Commits]
+        A9[OpenAlex & DAIR.AI]
     end
 
     subgraph Pipeline["Parallel Ingestion Pipeline"]
@@ -55,6 +56,7 @@ flowchart TD
     end
 
     subgraph Reason["Reasoning Engine (LangGraph Pipeline)"]
+        R0[Semantic Cache pgvector Bypass]
         R1[Decomposition Node]
         R2[Retrieval Node]
         R3[Analysis Crew Consensuses]
@@ -66,14 +68,14 @@ flowchart TD
         D1["GET /api/v1/health"]
         D2["GET /api/v1/search"]
         D3["POST /api/v1/reason"]
-        D4["GET /api/v1/groq/status"]
+        D4["GET /api/v1/reason/{id}/stream (SSE)"]
     end
 
     subgraph Frontend["Interactive React 19 Frontend SPA"]
         E1[Dashboard Tracker]
         E2[NL Ask Interface]
         E3[Graph Explorer]
-        E4[Quality Telemetry]
+        E4[Real-Time SSE Telemetry]
     end
 
     Sources --> B1
@@ -103,7 +105,7 @@ flowchart TD
     class C1,C2,C3 storeNode
     class D1,D2,D3,D4 apiNode
     class E1,E2,E3,E4 feNode
-    class R1,R2,R3,R4,R5 reasonNode
+    class R0,R1,R2,R3,R4,R5 reasonNode
 ```
 
 ---
@@ -255,7 +257,7 @@ cd frontend && npm install && npm run dev
 | **Vite Frontend SPA** | `http://localhost:5173` | React 19 interactive dashboards and chat portal |
 | **REST API Server Gateway** | `http://localhost:8082` | FastAPI root status endpoint |
 | **Interactive API Documentation** | `http://localhost:8082/docs` | Swagger UI playground |
-| **Health and Entity Counts** | `http://localhost:8082/api/v1/health` | Live telemetry mapping counts and statuses |
+| **Real-Time Pipeline Status** | `http://localhost:8082/api/v1/reason/{id}/stream` | Server-Sent Events (SSE) live telemetry stream |
 
 ---
 
@@ -264,19 +266,19 @@ cd frontend && npm install && npm run dev
 | Core Layer | v2.0 (NEXUS) | v3.0 (SYNAPSE) | v4.0.0 (SYNAPSE Enterprise) |
 | :--- | :--- | :--- | :--- |
 | **LLM Orchestration** | CrewAI Static Flows | LangGraph Pipeline | **Heterogeneous Dynamic Routing with token budget gates** |
-| **Inference Mode** | Synchronous requests | Async threads (unmanaged) | **100% Async Groq completions (AsyncGroq) and streaming yields** |
+| **UI Telemetry** | HTTP Long-Polling | HTTP 2.0s Polling | **Real-Time Streaming via Server-Sent Events (SSE)** |
+| **Query Memory** | None | Ephemeral session IDs | **Zero-Latency Semantic Caching via pgvector bypass** |
 | **State Persistence** | SQLite (ephemeral) | PostgreSQL DB tables | **Google Cloud Firestore (serverless, scale-to-zero async checkpointing)** |
 | **Vector Indexing** | In-memory arrays | Dedicated Qdrant Cloud | **pgvector halfvec(384) on Neon Postgres (integrated, low latency)** |
 | **Budget Controls** | None | Raw DynamoDB Oracle | **LeakyBucket Semaphore Gating + dynamic prompt-caching deductions** |
 | **Circuit Breakers** | None | In-memory breakers | **Persistent JSON Breakpoint with dedicated lockfile flocking** |
-| **Middleware & Sweeper** | Standard CORS | Static rate limiter | **Lazy-Pruning Client IP middleware (avoids leaky background threads)** |
 
 ---
 
 ## 🎨 Clean Code: Design Patterns Applied
 
 *   **Singleton:** Applied to `embedding/generator.py`. Keeps `SentenceTransformers` weights cached in a global, thread-safe memory registry, reducing model reload latency by **85%+**.
-*   **Circuit Breaker:** Implemented in `ingestion/circuit_breaker.py`. Protects all 9 Daily APIs from retry storm bottlenecks, writing lockfile state records to assure concurrent safety.
+*   **Circuit Breaker:** Implemented in `ingestion/circuit_breaker.py`. Protects all 15 Daily APIs from retry storm bottlenecks, writing lockfile state records to assure concurrent safety.
 *   **Strategy:** Used in `ingestion/pipeline/extraction.py`. SWAPs extraction logic formats (regex, structural parsing, or LLM mapping) dynamically according to source schemas.
 *   **Factory Registry:** Implemented in `ingestion/source_factory.py`. Loads custom source types (`"custom_csv"`, `"rss"`, `"scrape"`) without modifying core codebase files.
 *   **Observer:** Configured in `webhook/dispatcher.py`. Dispatches SHA256 HMAC signed payloads notifying developer servers about pipeline ingestion completions.
@@ -289,10 +291,10 @@ cd frontend && npm install && npm run dev
 synapse/
 ├── api/                        # FastAPI REST Server Layer
 │   ├── main.py                 # App entry point (FastAPI lifespan, CORS, routers)
-│   ├── middleware.py           # Lazy rate limiting, client IP eviction, security headers
+│   ├── semantic_cache.py       # pgvector zero-latency semantic cache bypass
 │   └── v1/
 │       ├── router.py           # Core endpoints (search, health, diff, export)
-│       └── reasoning.py        # /reason deep reasoning job telemetry endpoints
+│       └── reasoning.py        # /reason deep reasoning job and SSE endpoints
 ├── reasoning/                  # 7-Node LangGraph Engine
 │   ├── graph/
 │   │   ├── builder.py          # Topology constructor & YAML dynamic assembler

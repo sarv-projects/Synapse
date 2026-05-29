@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,19 @@ async def reason(request: ReasonRequest):
     """Submit a deep reasoning query. Returns job_id immediately (async)."""
     job_id = str(uuid.uuid4())
     session_id = request.session_id or str(uuid.uuid4())
+
+    from api.semantic_cache import get_semantic_cache
+    cache = get_semantic_cache()
+    cached_result = await cache.check_cache(request.query)
+    if cached_result:
+        logger.info(f"Bypassing reasoning pipeline for job {job_id} due to cache hit")
+        await _set_job(job_id, {
+            "job_id": job_id, "status": "COMPLETE", "current_node": "cache",
+            "query": request.query, "session_id": session_id,
+            "format": request.format, "created_at": datetime.now(UTC).isoformat(),
+            "result": cached_result, "produced_by": "semantic_cache",
+        })
+        return {"job_id": job_id, "status": "COMPLETE"}
 
     await _set_job(job_id, {
         "job_id": job_id, "status": "PENDING", "current_node": "",
@@ -169,6 +183,11 @@ async def _run_reasoning_pipeline(job_id: str, query: str, session_id: str, fmt:
         except Exception as e:
             logger.error(f"Failed to attach RAGAS eval for job {job_id}: {e}", exc_info=True)
 
+        final_job = await _get_job(job_id)
+        if final_job and "result" in final_job and final_job["result"]:
+            from api.semantic_cache import get_semantic_cache
+            await get_semantic_cache().save_to_cache(query, final_job["result"])
+
         await _save_checkpoint(state, "output")
 
     except Exception as e:
@@ -254,6 +273,49 @@ async def get_reason_result(job_id: str, format: str | None = Query(default=None
         response["produced_by"] = job.get("produced_by", "")
 
     return response
+
+
+@reasoning_router.get("/reason/{job_id}/stream")
+async def stream_reason_result(job_id: str):
+    """Stream reasoning job updates using Server-Sent Events (SSE)."""
+    import json
+    
+    async def event_generator():
+        last_node = None
+        last_status = None
+        while True:
+            job = await _get_job(job_id)
+            if not job:
+                yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+                break
+                
+            current_node = job.get("current_node", "")
+            status = job.get("status", "")
+            
+            if current_node != last_node or status != last_status or status in ("COMPLETE", "FAILED"):
+                last_node = current_node
+                last_status = status
+                
+                payload = {
+                    "job_id": job_id,
+                    "status": status,
+                    "current_node": current_node,
+                    "query": job.get("query", ""),
+                }
+                
+                if status in ("COMPLETE", "FAILED"):
+                    payload["result"] = job.get("result")
+                    payload["error"] = job.get("error")
+                    payload["produced_by"] = job.get("produced_by", "")
+                
+                yield f"data: {json.dumps(payload)}\n\n"
+                
+                if status in ("COMPLETE", "FAILED"):
+                    break
+            
+            await asyncio.sleep(0.5)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @reasoning_router.post("/ingest")

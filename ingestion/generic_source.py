@@ -107,8 +107,12 @@ class GenericSourceFetcher(SourceFetcher):
         pagination = self.config.pagination or {}
         strategy = pagination.get("strategy", "none")
         max_pages = pagination.get("max_pages", 10 if strategy != "none" else 1)
+        page_delay = float(pagination.get("page_delay", 0.0))
 
         for _page in range(max_pages):
+            if _page > 0 and page_delay > 0:
+                import asyncio
+                await asyncio.sleep(page_delay)
             try:
                 response = await self.client.get(url, params=params)
                 _ = response.raise_for_status()
@@ -155,8 +159,12 @@ class GenericSourceFetcher(SourceFetcher):
         pagination = self.config.pagination or {}
         strategy = pagination.get("strategy", "none")
         max_pages = pagination.get("max_pages", 10 if strategy != "none" else 1)
+        page_delay = float(pagination.get("page_delay", 0.0))
 
         for _page in range(max_pages):
+            if _page > 0 and page_delay > 0:
+                import asyncio
+                await asyncio.sleep(page_delay)
             try:
                 response = await self.client.get(url, params=params)
                 _ = response.raise_for_status()

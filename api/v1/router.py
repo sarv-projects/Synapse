@@ -355,9 +355,132 @@ async def diff(
         return {"added": [], "removed": [], "from": from_date, "to": to_date, "error": str(e)}
 
 
+async def _get_lmsys_arena_leaderboard(category: str = "overall") -> list[dict]:
+    """Fetch LMSYS Chatbot Arena leaderboard from Hugging Face parquet or fallback to cached state."""
+    import os
+    import json
+    import time
+    import httpx
+    import tempfile
+    import pyarrow.parquet as pq
+
+    _CACHE_PATH = "lmsys_arena_leaderboard.json"
+    category_norm = category.lower().strip()
+    if category_norm not in ("overall", "coding", "math", "instruction_following", "creative_writing", "hard_prompts"):
+        category_norm = "overall"
+
+    # Up-to-date high quality fallback list in case everything fails
+    fallback_models = {
+        "overall": [
+            {"id": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)", "score": 1499, "description": "Arena Elo: 1499 | Rank: 1 | License: Proprietary | Org: Anthropic | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "score": 1497, "description": "Arena Elo: 1497 | Rank: 2 | License: Proprietary | Org: Anthropic | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "score": 1482, "description": "Arena Elo: 1482 | Rank: 4 | License: Proprietary | Org: Google | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro (Preview)", "score": 1481, "description": "Arena Elo: 1481 | Rank: 5 | License: Proprietary | Org: Google | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "qwen3.7-max-preview", "name": "Qwen 3.7 Max (Preview)", "score": 1474, "description": "Arena Elo: 1474 | Rank: 8 | License: Proprietary | Org: Alibaba | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "muse-spark", "name": "Muse Spark", "score": 1474, "description": "Arena Elo: 1474 | Rank: 9 | License: Open Weights | Org: Meta | Date: 2026-05-27", "library": "Open Weights"},
+            {"id": "gpt-5.4-high", "name": "GPT 5.4 High", "score": 1472, "description": "Arena Elo: 1472 | Rank: 10 | License: Proprietary | Org: OpenAI | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "score": 1421, "description": "Arena Elo: 1421 | Rank: 25 | License: Open Weights | Org: Meta | Date: 2026-05-27", "library": "Open Weights"},
+            {"id": "deepseek-v3", "name": "DeepSeek V3", "score": 1410, "description": "Arena Elo: 1410 | Rank: 29 | License: Open Weights | Org: DeepSeek | Date: 2026-05-27", "library": "Open Weights"},
+        ],
+        "coding": [
+            {"id": "claude-opus-4-6-thinking", "name": "Claude Opus 4.6 (Thinking)", "score": 1520, "description": "Arena Elo: 1520 | Rank: 1 | License: Proprietary | Org: Anthropic | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "score": 1501, "description": "Arena Elo: 1501 | Rank: 2 | License: Proprietary | Org: Google | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "qwen3.7-max-preview", "name": "Qwen 3.7 Max (Preview)", "score": 1490, "description": "Arena Elo: 1490 | Rank: 4 | License: Proprietary | Org: Alibaba | Date: 2026-05-27", "library": "Proprietary"},
+            {"id": "deepseek-v3", "name": "DeepSeek V3", "score": 1455, "description": "Arena Elo: 1455 | Rank: 12 | License: Open Weights | Org: DeepSeek | Date: 2026-05-27", "library": "Open Weights"},
+        ]
+    }
+    # Add other categories with fallback to overall if missing
+    for cat in ("math", "instruction_following", "creative_writing", "hard_prompts"):
+        if cat not in fallback_models:
+            fallback_models[cat] = fallback_models["overall"]
+
+    # 1. Try reading from local cache file
+    if os.path.exists(_CACHE_PATH):
+        try:
+            mtime = os.path.getmtime(_CACHE_PATH)
+            if time.time() - mtime < 14400:  # 4 hours
+                with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+                    cache_data = json.load(f)
+                    if isinstance(cache_data, dict) and category_norm in cache_data:
+                        return cache_data[category_norm]
+        except Exception as e:
+            logger.warning(f"Failed to read from leaderboard cache file: {e}")
+
+    # 2. Try fetching from Hugging Face
+    try:
+        url = "https://huggingface.co/datasets/lmarena-ai/leaderboard-dataset/resolve/main/text/latest-00000-of-00001.parquet"
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+                    tmp.write(response.content)
+                    tmp_path = tmp.name
+
+                try:
+                    table = pq.read_table(tmp_path)
+                    df = table.to_pandas()
+
+                    new_cache = {}
+                    categories_to_cache = ["overall", "coding", "math", "instruction_following", "creative_writing", "hard_prompts"]
+                    for cat in categories_to_cache:
+                        cat_df = df[df["category"] == cat].copy()
+                        if cat_df.empty:
+                            continue
+                        
+                        cat_df = cat_df.sort_values("rating", ascending=False)
+                        
+                        records = []
+                        for rank_idx, (_, row) in enumerate(cat_df.iterrows(), 1):
+                            model_name = str(row.get("model_name", ""))
+                            org = str(row.get("organization", "unknown"))
+                            license_type = str(row.get("license", "unknown"))
+                            rating = row.get("rating", 1200)
+                            rating_val = int(rating) if not hasattr(rating, "isna") or not rating.isna() else 1200
+                            pub_date = str(row.get("leaderboard_publish_date", ""))
+
+                            license_display = "Open Weights" if any(x in license_type.lower() for x in ("open", "apache", "mit", "llama", "gemma", "qwen")) else "Proprietary"
+
+                            records.append({
+                                "id": model_name,
+                                "name": f"{model_name} ({org.upper()})",
+                                "score": rating_val,
+                                "description": f"Arena Elo: {rating_val} | Rank: {rank_idx} | License: {license_display} | Org: {org.title()} | Date: {pub_date}",
+                                "library": license_display
+                            })
+                        
+                        new_cache[cat] = records
+
+                    if new_cache:
+                        with open(_CACHE_PATH, "w", encoding="utf-8") as f:
+                            json.dump(new_cache, f, ensure_ascii=False, indent=2)
+                        
+                        if category_norm in new_cache:
+                            return new_cache[category_norm]
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+    except Exception as e:
+        logger.error(f"Failed to fetch live LMSYS leaderboard from HF: {e}", exc_info=True)
+
+    # 3. Fallback to expired cache if available
+    if os.path.exists(_CACHE_PATH):
+        try:
+            with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+                cache_data = json.load(f)
+                if isinstance(cache_data, dict) and category_norm in cache_data:
+                    logger.info("Using expired leaderboard cache as fallback.")
+                    return cache_data[category_norm]
+        except Exception:
+            pass
+
+    logger.warning("Using hardcoded fallback list for Chatbot Arena leaderboard.")
+    return fallback_models.get(category_norm, fallback_models["overall"])
+
+
 @router.get("/leaderboard")
 async def leaderboard(
     type: str = Query(default="tools"),
+    category: str = Query(default="overall"),
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """Top tools, papers, or techniques leaderboard."""
@@ -368,51 +491,47 @@ async def leaderboard(
     client = Neo4jClient.from_settings(settings)
 
     try:
-        async with client.session() as session:
-            if type == "tools":
-                r = await session.run("""
-                    MATCH (n:Tool) WHERE n.stargazers_count IS NOT NULL
-                    RETURN n.full_name AS id, n.full_name AS name,
-                           n.stargazers_count AS score, n.description AS description,
-                           n.language AS language, n.topics AS topics,
-                           n.html_url AS url
-                    ORDER BY n.stargazers_count DESC LIMIT $limit
-                """, limit=limit)
-            elif type == "models":
-                r = await session.run("""
-                    MATCH (n:Model) WHERE n.downloads IS NOT NULL
-                    RETURN n.hf_model_id AS id, n.hf_model_id AS name,
-                           n.downloads AS score, n.pipeline_tag AS pipeline_tag,
-                           n.likes AS likes, n.library_name AS library
-                    ORDER BY n.downloads DESC LIMIT $limit
-                """, limit=limit)
-            elif type == "papers":
-                r = await session.run("""
-                    MATCH (n:Paper) RETURN n.title AS id, n.title AS name,
-                           n.arxiv_id AS arxiv_id, n.published AS published,
-                           n.link AS url
-                    ORDER BY n.published DESC LIMIT $limit
-                """, limit=limit)
-            elif type == "techniques":
-                r = await session.run("""
-                    MATCH (n:Technique) RETURN n.canonical_name AS id,
-                           n.canonical_name AS name, n.description AS description
-                    ORDER BY n.name LIMIT $limit
-                """, limit=limit)
-            else:
-                r = await session.run("""
-                    MATCH (n:Tool) WHERE n.stargazers_count IS NOT NULL
-                    RETURN n.full_name AS id, n.full_name AS name,
-                           n.stargazers_count AS score
-                    ORDER BY n.stargazers_count DESC LIMIT $limit
-                """, limit=limit)
+        items = []
+        if type == "models":
+            # Direct LMSYS Chatbot Arena leaderboard merge
+            items = await _get_lmsys_arena_leaderboard(category=category)
+        else:
+            async with client.session() as session:
+                if type == "tools":
+                    r = await session.run("""
+                        MATCH (n:Tool) WHERE n.stargazers_count IS NOT NULL
+                        RETURN n.full_name AS id, n.full_name AS name,
+                               n.stargazers_count AS score, n.description AS description,
+                               n.language AS language, n.topics AS topics,
+                               n.html_url AS url
+                        ORDER BY n.stargazers_count DESC LIMIT $limit
+                    """, limit=limit)
+                elif type == "papers":
+                    r = await session.run("""
+                        MATCH (n:Paper) RETURN n.title AS id, n.title AS name,
+                               n.arxiv_id AS arxiv_id, n.published AS published,
+                               n.link AS url
+                        ORDER BY n.published DESC LIMIT $limit
+                    """, limit=limit)
+                elif type == "techniques":
+                    r = await session.run("""
+                        MATCH (n:Technique) RETURN n.canonical_name AS id,
+                               n.canonical_name AS name, n.description AS description
+                        ORDER BY n.name LIMIT $limit
+                    """, limit=limit)
+                else:
+                    r = await session.run("""
+                        MATCH (n:Tool) WHERE n.stargazers_count IS NOT NULL
+                        RETURN n.full_name AS id, n.full_name AS name,
+                               n.stargazers_count AS score
+                        ORDER BY n.stargazers_count DESC LIMIT $limit
+                    """, limit=limit)
 
-            items = []
-            async for record in r:
-                items.append(dict(record))
+                async for record in r:
+                    items.append(dict(record))
 
         await client.close()
-        return {"type": type, "items": items, "count": len(items)}
+        return {"type": type, "items": items[:limit], "count": len(items[:limit])}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
         # rewritten as a 200 by the catch-all below.

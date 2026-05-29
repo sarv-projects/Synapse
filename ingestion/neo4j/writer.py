@@ -51,7 +51,7 @@ def _node_to_row(node: GraphNode) -> dict[str, Any]:
     props["confidence"] = node.confidence
 
     key_prop = _dedup_key_for(node.label)
-    key_val  = node.properties.get(key_prop) or node.properties.get("name") or node.key
+    key_val  = node.properties.get(key_prop) or node.properties.get("id") or node.properties.get("title") or node.properties.get("name") or node.key
 
     return {"key_value": str(key_val), "props": props}
 

@@ -33,7 +33,7 @@ export default function Reason() {
   const [result, setResult] = useState<ResultType | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
 
   const submitQuery = async () => {
     if (!query.trim()) return
@@ -42,6 +42,10 @@ export default function Reason() {
     setError('')
     setStatus('')
     setCurrentNode('')
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
 
     try {
       const res = await fetch('/api/v1/reason', {
@@ -52,18 +56,36 @@ export default function Reason() {
       setJobId(data.job_id)
       setStatus(data.status)
 
-      intervalRef.current = setInterval(async () => {
-        const r = await fetch(`/api/v1/reason/${data.job_id}`)
-        const d = await r.json()
+      // Start SSE stream
+      const eventSource = new EventSource(`/api/v1/reason/${data.job_id}/stream`)
+      eventSourceRef.current = eventSource
+
+      eventSource.onmessage = (event) => {
+        const d = JSON.parse(event.data)
+        if (d.error) {
+          setError(d.error)
+          setLoading(false)
+          eventSource.close()
+          return
+        }
+
         setStatus(d.status)
-        setCurrentNode(d.current_node || '')
+        setCurrentNode(d.current_node || (d.status === 'COMPLETE' ? 'output' : ''))
+
         if (d.status === 'COMPLETE' || d.status === 'FAILED') {
-          if (intervalRef.current) clearInterval(intervalRef.current)
+          eventSource.close()
           setLoading(false)
           if (d.status === 'COMPLETE') setResult(d.result)
           else setError(d.error || 'Pipeline failed')
         }
-      }, 2000)
+      }
+
+      eventSource.onerror = (err) => {
+        console.error("SSE Error:", err)
+        setError("Connection lost to reasoning stream.")
+        setLoading(false)
+        eventSource.close()
+      }
     } catch (e) {
       setError(String(e))
       setLoading(false)
@@ -71,7 +93,7 @@ export default function Reason() {
   }
 
   useEffect(() => () => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (eventSourceRef.current) eventSourceRef.current.close()
   }, [])
 
   const stageIndex = STAGE_MAP[currentNode] ?? -1

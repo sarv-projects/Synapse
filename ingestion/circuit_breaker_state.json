@@ -8,15 +8,15 @@
   },
   "arxiv": {
     "state": "closed",
-    "failure_count": 1,
-    "last_failure_time": "2026-05-29T08:08:38.728700",
+    "failure_count": 2,
+    "last_failure_time": "2026-05-29T11:09:29.404356",
     "failure_threshold": 3,
     "timeout_seconds": 1800
   },
   "huggingface_daily_papers": {
     "state": "closed",
-    "failure_count": 1,
-    "last_failure_time": "2026-05-29T08:08:07.960524",
+    "failure_count": 0,
+    "last_failure_time": "2026-05-29T11:10:23.388838",
     "failure_threshold": 3,
     "timeout_seconds": 1800
   },
@@ -57,12 +57,19 @@
   },
   "semantic_scholar": {
     "state": "closed",
+    "failure_count": 1,
+    "last_failure_time": "2026-05-29T11:10:46.833058",
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "dair_ai_ml_papers": {
+    "state": "closed",
     "failure_count": 0,
     "last_failure_time": null,
     "failure_threshold": 3,
     "timeout_seconds": 1800
   },
-  "dair_ai_ml_papers": {
+  "openalex": {
     "state": "closed",
     "failure_count": 0,
     "last_failure_time": null,
