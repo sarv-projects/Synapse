@@ -60,12 +60,11 @@ def setup_environment():
     print("   Get connection string at: https://neon.tech/")
     postgres_url = input("   PostgreSQL URL: ").strip()
     
-    # Qdrant Cloud
-    print("\n6️⃣ Qdrant Cloud (Free Tier)")
-    print("   Get credentials at: https://cloud.qdrant.io/")
-    qdrant_url = input("   Qdrant URL: ").strip()
-    qdrant_key = input("   Qdrant API Key: ").strip()
-    
+    # Google Cloud Project (Firestore)
+    print("\n6️⃣ Google Cloud Project (Firestore checkpointing — free tier)")
+    print("   Create at: https://console.cloud.google.com/")
+    gcp_project = input("   GCP Project ID: ").strip()
+
     # SYNAPSE Admin Key
     print("\n7️⃣ SYNAPSE Admin Key")
     synapse_key = input("   Admin Key (generate a strong one): ").strip()
@@ -77,7 +76,7 @@ def setup_environment():
     print(f"   Gemini: {'✅ Configured' if gemini_key else '⚠️ Skipped'}")
     print(f"   GitHub: {'✅ Configured' if github_token else '⚠️ Skipped'}")
     print(f"   PostgreSQL: {'✅ Configured' if postgres_url else '❌ Missing'}")
-    print(f"   Qdrant: {'✅ Configured' if qdrant_url else '❌ Missing'}")
+    print(f"   GCP Project: {'✅ Configured' if gcp_project else '⚠️ Skipped'}")
     
     confirm = input("\n❓ Save this configuration to .env? (y/N): ").strip().lower()
     
@@ -90,8 +89,8 @@ def setup_environment():
             'GEMINI_API_KEY': gemini_key,
             'GITHUB_TOKEN': github_token,
             'POSTGRES_URL': postgres_url,
-            'QDRANT_URL': qdrant_url,
-            'QDRANT_API_KEY': qdrant_key,
+            'GOOGLE_CLOUD_PROJECT': gcp_project,
+            'GCP_PROJECT': gcp_project,
             'SYNAPSE_ADMIN_KEY': synapse_key,
             'API_VERSION': 'v1',
             'CORS_ORIGINS': 'http://localhost:5173,https://synapse.yourdomain.com',

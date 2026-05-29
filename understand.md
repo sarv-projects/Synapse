@@ -31,7 +31,7 @@ Every day at 5:30 AM IST, an automated job:
 | What | Technology | Why |
 |------|-----------|-----|
 | Graph database | Neo4j Aura | Stores nodes (papers, tools) and edges (relationships) |
-| Vector search | Qdrant Cloud | Finds semantically similar items |
+| Vector search | pgvector (Neon) | Finds semantically similar items |
 | AI inference | Groq (Llama 4 Scout) | Translates English questions to graph queries |
 | Backend API | FastAPI (Python) | Serves data to the frontend |
 | Frontend | React 19 + Vite | The website users see |
@@ -180,7 +180,7 @@ def get_settings() -> Settings:
 - `neo4j_uri/username/password/database` — how to connect to Neo4j
 - `groq_api_keys` — comma-separated list of Groq API keys (e.g. `key1,key2,key3`)
 - `groq_model` — which AI model to use (default: `meta-llama/llama-4-scout-17b-16e-instruct`)
-- `qdrant_url/api_key` — Qdrant vector database connection
+- `postgres_url` — Neon pgvector connection (vector store + checkpointing)
 - `postgres_url` — PostgreSQL for checkpointing
 - `cors_origins` — which websites are allowed to call the API
 - `synapse_admin_key` — secret key for admin operations
@@ -617,7 +617,7 @@ Exponential backoff means: wait 1 second, then 2 seconds, then 4 seconds between
 
 These patterns are enforced as architectural contracts — not optional suggestions. Understanding them explains why each module is structured the way it is.
 
-### Singleton — Neo4j driver, Qdrant client, Groq client
+### Singleton — Neo4j driver, PGVectorStore, Groq client
 
 Module-level instances checked at import time. Prevents connection storms on startup — there is exactly one connection pool shared across all pipeline stages.
 

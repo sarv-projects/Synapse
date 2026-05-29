@@ -19,8 +19,14 @@ jobs:
       GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
       GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
       POSTGRES_URL:      ${{ secrets.POSTGRES_URL }}
-      QDRANT_URL:        ${{ secrets.QDRANT_URL }}
-      QDRANT_API_KEY:    ${{ secrets.QDRANT_API_KEY }}
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      HF_TOKEN:          ${{ secrets.HF_TOKEN }}
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION:        ${{ secrets.AWS_REGION }}
+      DYNAMODB_TABLE:    ${{ secrets.DYNAMODB_TABLE }}
+      SQS_QUEUE_URL:     ${{ secrets.SQS_QUEUE_URL }}
+      CORS_ORIGINS:      http://localhost:5173
       DEFAULT_DOMAIN:    ai
       LOG_LEVEL:         INFO
 

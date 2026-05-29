@@ -152,11 +152,11 @@ class EmbeddingPipeline:
                 "domain": "ai"  # Default domain
             })
         
-        # Upsert to Qdrant
-        if self.qdrant_client.upsert_vectors(qdrant_nodes):
+        # Upsert to pgvector
+        if await self.qdrant_client.upsert_vectors_async(qdrant_nodes):
             results["qdrant_upserted"] = len(qdrant_nodes)
         else:
-            error_msg = "Failed to upsert vectors to Qdrant"
+            error_msg = "Failed to upsert vectors to pgvector"
             logger.error(error_msg)
             results["errors"].append(error_msg)
             return results
@@ -232,22 +232,22 @@ class EmbeddingPipeline:
         
         return updated_count
     
-    async def _create_embedding_index_node(self, session, entity: Dict[str, Any], vector: List[float]):
+    async def _create_embedding_index_node(self, session, entity: dict, vector: list):
         """Create EmbeddingIndex node to track vector metadata."""
-        qdrant_id = str(entity["id"])  # Use same ID as entity
-        
+        vector_id = str(entity["id"])
+
         query = """
-        MERGE (ei:EmbeddingIndex {qdrant_id: $qdrant_id})
+        MERGE (ei:EmbeddingIndex {vector_id: $vector_id})
         SET ei.node_uuid = $node_uuid,
             ei.model_version = 'all-MiniLM-L6-v2',
             ei.dim = $dim,
             ei.indexed_at = datetime(),
             ei.last_seen = datetime()
         """
-        
+
         await session.run(
             query,
-            qdrant_id=qdrant_id,
+            vector_id=vector_id,
             node_uuid=entity["id"],
             dim=len(vector)
         )
@@ -264,8 +264,8 @@ class EmbeddingPipeline:
         # Generate query embedding
         query_vector = gen.generate_query_embedding(query_text)
         
-        # Search Qdrant
-        similar_items = self.qdrant_client.search_similar(
+        # Search pgvector
+        similar_items = await self.qdrant_client.search_similar_async(
             query_vector=query_vector,
             limit=limit,
             score_threshold=score_threshold,

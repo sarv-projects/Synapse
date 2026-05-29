@@ -1,4 +1,4 @@
-"""Background content acquisition — 9 curated sources, 6-hourly scrape, 5-gate verifier."""
+"""Background content acquisition — 9 curated sources, 2-hourly scrape, 5-gate verifier."""
 import asyncio
 import hashlib
 import json
@@ -79,19 +79,19 @@ def _gate4_source_credibility(source_type: str, metrics: dict, url: str) -> bool
 
 
 async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
-    """Gate 5: Qdrant semantic dedup — cosine ≥ 0.92 means duplicate."""
+    """Gate 5: pgvector semantic dedup — cosine ≥ 0.92 means duplicate."""
     try:
         from embedding.generator import get_embedding_generator
         from embedding.qdrant_client import get_qdrant_client
         gen = await get_embedding_generator()
         vector = gen.generate_entity_embedding(title, content[:512])
-        qdrant = get_qdrant_client()
-        results = qdrant.search_similar(vector, limit=1, score_threshold=0.92)
+        store = get_qdrant_client()
+        results = await store.search_similar_async(vector, limit=1, score_threshold=0.92)
         if results:
             _log_reject(f"Semantic duplicate (cosine ≥ 0.92)", url, 5, {"match_url": results[0].get("payload", {}).get("name", "")})
             return False
     except Exception as e:
-        logger.debug(f"Gate 5 Qdrant dedup skipped: {e}")
+        logger.debug(f"Gate 5 pgvector dedup skipped: {e}")
     return True
 
 
@@ -199,8 +199,30 @@ async def _fetch_youtube(session) -> list[dict]:
 
 
 async def _fetch_substack(session) -> list[dict]:
-    """Substack AI newsletters (placeholder — RSS feeds vary)."""
-    return []
+    """Substack AI newsletters via RSS feeds."""
+    feeds = [
+        "https://www.interconnects.ai/feed",
+        "https://thegradient.pub/rss/",
+        "https://newsletter.theaiedge.io/feed",
+        "https://aiweekly.co/issues.rss",
+    ]
+    results = []
+    for feed_url in feeds:
+        try:
+            import feedparser
+            import asyncio
+            feed = await asyncio.to_thread(feedparser.parse, feed_url)
+            for entry in feed.entries[:2]:
+                results.append({
+                    "title": entry.get("title", ""),
+                    "content": entry.get("summary", "")[:5000],
+                    "url": entry.get("link", ""),
+                    "source_type": "substack",
+                    "metrics": {"score": 10},
+                })
+        except Exception as e:
+            logger.debug(f"Substack feed {feed_url} failed: {e}")
+    return results
 
 
 async def _fetch_blogs(session) -> list[dict]:
@@ -225,7 +247,7 @@ async def _fetch_blogs(session) -> list[dict]:
 
 async def run_background_scrape(dry_run: bool = False) -> dict:
     """Run full background content acquisition pipeline."""
-    logger.info("Starting background scrape (6-hourly) — 9 sources")
+    logger.info("Starting background scrape (2-hourly) — 9 sources")
     stats = {"total_fetched": 0, "passed": 0, "rejected": 0, "stored": 0, "errors": 0}
 
     import aiohttp

@@ -64,5 +64,8 @@ logs/
 # OpenCode internal
 .omo/
 
+# Firebase deploy cache
+.firebase/
+
 # Misc
 SYNAPSE_v4_SPEC.md

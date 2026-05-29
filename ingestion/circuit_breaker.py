@@ -119,7 +119,8 @@ class CircuitBreakerRegistry:
                 }
 
             temp_path = f"{self.state_path}.tmp"
-            lock_file = open(self.state_path, "a+")
+            lock_path = f"{self.state_path}.lock"
+            lock_file = open(lock_path, "a+")
             fcntl.flock(lock_file, fcntl.LOCK_EX)
             try:
                 temp_f = open(temp_path, "w")

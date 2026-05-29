@@ -70,7 +70,11 @@ class GenericSourceFetcher(SourceFetcher):
         if self.config.auth_env_var:
             token = os.environ.get(self.config.auth_env_var, "")
             if token:
-                headers["Authorization"] = f"token {token}"
+                # HuggingFace uses Bearer; GitHub uses token
+                if self.config.auth_env_var == "HF_TOKEN":
+                    headers["Authorization"] = f"Bearer {token}"
+                else:
+                    headers["Authorization"] = f"token {token}"
 
         self.client = httpx.AsyncClient(
             headers=headers,

@@ -19,7 +19,7 @@ class GroqProvider(InferenceProvider):
 
     async def generate(self, prompt: AssembledPrompt, config: InferenceConfig) -> InferenceResult:
         from api.groq_manager import get_groq_manager
-        from groq import Groq, RateLimitError
+        from groq import AsyncGroq, RateLimitError
         import asyncio
 
         manager = get_groq_manager()
@@ -27,7 +27,7 @@ class GroqProvider(InferenceProvider):
         if not key:
             raise RuntimeError(f"No healthy Groq keys for model {self.model_id}")
 
-        client = Groq(api_key=key.api_key)
+        client = AsyncGroq(api_key=key.api_key)
         messages = prompt.to_messages()
 
         messages_typed: list[dict[str, str]] = messages
@@ -45,7 +45,7 @@ class GroqProvider(InferenceProvider):
         backoff = 2.0
         for attempt in range(max_retries + 1):
             try:
-                response = client.chat.completions.create(**kwargs)
+                response = await client.chat.completions.create(**kwargs)
                 choice = response.choices[0]
                 usage = response.usage
 
@@ -75,7 +75,7 @@ class GroqProvider(InferenceProvider):
 
     async def stream(self, prompt: AssembledPrompt, config: InferenceConfig) -> collections.abc.AsyncIterator[str]:
         from api.groq_manager import get_groq_manager
-        from groq import Groq, RateLimitError
+        from groq import AsyncGroq, RateLimitError
         import asyncio
 
         manager = get_groq_manager()
@@ -83,7 +83,7 @@ class GroqProvider(InferenceProvider):
         if not key:
             raise RuntimeError(f"No healthy Groq keys for model {self.model_id}")
 
-        client = Groq(api_key=key.api_key)
+        client = AsyncGroq(api_key=key.api_key)
         messages = prompt.to_messages()
 
         max_retries = 3
@@ -98,7 +98,7 @@ class GroqProvider(InferenceProvider):
         )
         for attempt in range(max_retries + 1):
             try:
-                stream = client.chat.completions.create(**stream_kwargs)
+                stream = await client.chat.completions.create(**stream_kwargs)
                 break
             except RateLimitError:
                 if attempt < max_retries:
@@ -111,23 +111,6 @@ class GroqProvider(InferenceProvider):
                 raise
 
         if stream:
-            import asyncio
-            import queue
-
-            q: queue.Queue[str | None] = queue.Queue()
-
-            def _consume():
-                try:
-                    for chunk in stream:
-                        if chunk.choices and chunk.choices[0].delta.content:
-                            q.put(chunk.choices[0].delta.content)
-                finally:
-                    q.put(None)
-
-            task = asyncio.get_event_loop().run_in_executor(None, _consume)
-            while True:
-                item = await asyncio.to_thread(q.get)
-                if item is None:
-                    break
-                yield item
-            await task
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content

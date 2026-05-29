@@ -2,7 +2,7 @@ name: Background Scrape
 
 on:
   schedule:
-    - cron: "0 0,6,12,18 * * *"
+    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 jobs:
@@ -11,12 +11,17 @@ jobs:
     timeout-minutes: 15
 
     env:
-      NEO4J_URI:      ${{ secrets.NEO4J_URI }}
-      NEO4J_USERNAME:  ${{ secrets.NEO4J_USERNAME }}
-      NEO4J_PASSWORD:  ${{ secrets.NEO4J_PASSWORD }}
-      NEO4J_DATABASE:  ${{ secrets.NEO4J_DATABASE }}
-      QDRANT_URL:      ${{ secrets.QDRANT_URL }}
-      QDRANT_API_KEY:  ${{ secrets.QDRANT_API_KEY }}
+      NEO4J_URI:         ${{ secrets.NEO4J_URI }}
+      NEO4J_USERNAME:    ${{ secrets.NEO4J_USERNAME }}
+      NEO4J_PASSWORD:    ${{ secrets.NEO4J_PASSWORD }}
+      NEO4J_DATABASE:    ${{ secrets.NEO4J_DATABASE }}
+      GROQ_API_KEYS:     ${{ secrets.GROQ_API_KEYS }}
+      POSTGRES_URL:      ${{ secrets.POSTGRES_URL }}
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      ZENROWS_API_KEY:   ${{ secrets.ZENROWS_API_KEY }}
+      CORS_ORIGINS:      http://localhost:5173
+      LOG_LEVEL:         INFO
+      DEFAULT_DOMAIN:    ai
 
     steps:
       - uses: actions/checkout@v4

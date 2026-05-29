@@ -75,7 +75,7 @@ frontend/
 
 ### Search (`/search`)
 - **Full-text Search**: Neo4j BM25 search
-- **Vector Search**: Qdrant semantic similarity
+- **Vector Search**: pgvector semantic similarity
 - **Type Filtering**: Filter by entity type
 - **Confidence Slider**: Filter by trust level
 - **Cursor Pagination**: Efficient large result sets

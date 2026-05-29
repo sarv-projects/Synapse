@@ -104,8 +104,25 @@ async def _run_reasoning_pipeline(job_id: str, query: str, session_id: str, fmt:
     try:
         from reasoning.graph.state import ReasoningState
         from reasoning.graph.builder import GraphBuilder
+        from schema.config import get_settings
 
-        state = ReasoningState(query=query, session_id=session_id, format=fmt)
+        settings = get_settings()
+        state = ReasoningState(
+            query=query,
+            session_id=session_id,
+            format=fmt,
+            retry_count=0,
+            max_retries=settings.critic_max_retries,
+            retrieval_context=[],
+            web_results=[],
+            extracted_claims=[],
+            claim_evidence_map=[],
+            contradiction_flags=[],
+            model_trace={},
+            total_tokens_used={},
+            sub_questions=[],
+            search_queries=[],
+        )
         await _update_job(job_id, status="PROCESSING")
 
         graph = GraphBuilder().build()
@@ -165,29 +182,24 @@ def _merge_graph_update(state, update):
     """Merge LangGraph update payloads back into ReasoningState."""
     from reasoning.graph.state import ReasoningState
 
-    valid_fields = {f.name for f in fields(ReasoningState)}
+    valid_fields = set(ReasoningState.__annotations__.keys())
 
     def state_dict(value) -> dict:
-        if isinstance(value, ReasoningState):
-            return asdict(value)
-        if is_dataclass(value):
-            return asdict(value)
         if isinstance(value, dict):
             return {k: v for k, v in value.items() if k in valid_fields}
         return {}
 
     merged = state_dict(state)
-    if isinstance(update, ReasoningState):
-        merged.update(state_dict(update))
-    elif isinstance(update, dict):
+    if isinstance(update, dict):
         if any(k in valid_fields for k in update):
             merged.update(state_dict(update))
         else:
             for node_name, node_update in update.items():
                 if node_name == "__end__":
                     continue
-                merged.update(state_dict(node_update))
-                merged["current_node"] = merged.get("current_node") or node_name
+                if isinstance(node_update, dict):
+                    merged.update(state_dict(node_update))
+                    merged["current_node"] = merged.get("current_node") or node_name
 
     return ReasoningState(**{k: v for k, v in merged.items() if k in valid_fields})
 

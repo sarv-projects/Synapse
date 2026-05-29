@@ -1,111 +1,78 @@
-"""Retrieval layer — LlamaIndex RouterQueryEngine with VectorStoreIndex + BM25 + KG."""
+"""Retrieval layer — hybrid vector + BM25 + knowledge-graph router.
+
+Earlier revisions tried to use LlamaIndex's ``RouterQueryEngine`` over its
+``PGVectorStore``. That path was removed because LlamaIndex's PGVectorStore
+silently creates and reads from a ``data_synapse_vectors`` table with its own
+schema (``data_<table_name>`` is hardcoded in the library), which is
+incompatible with SYNAPSE's hand-managed ``synapse_vectors`` halfvec(384)
+table populated by :mod:`embedding.qdrant_client`. Routing through
+LlamaIndex therefore returned zero results regardless of how much data was
+ingested.
+
+The functions in :mod:`retrieval.query_engines` already implement vector,
+BM25, graph, and weighted hybrid retrieval directly against SYNAPSE's data
+stores, so this module is now a thin strategy dispatcher over them.
+"""
+from __future__ import annotations
+
 import logging
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
-LLAMAINDEX_AVAILABLE = False
-try:
-    from llama_index.core import Settings as LlamaSettings
-    from llama_index.core import VectorStoreIndex, SimpleKeywordTableIndex
-    from llama_index.core.query_engine import RouterQueryEngine
-    from llama_index.core.selectors import LLMSingleSelector
-    from llama_index.core.tools import QueryEngineTool
-    LLAMAINDEX_AVAILABLE = True
-except ImportError:
-    logger.warning("llama-index not installed; using hand-rolled retrieval fallback")
-
 
 class HybridRetrievalEngine:
-    """LlamaIndex RouterQueryEngine wrapping VectorStore + BM25 + KG indexes."""
+    """Dispatches retrieval queries to the appropriate hand-rolled engine."""
 
-    def __init__(self):
-        self._vector_index = None
-        self._bm25_index = None
-        self._query_engines: dict[str, Callable[..., Any]] = {}
+    def __init__(self) -> None:
+        self._engines: dict[str, Callable[..., Awaitable[list[dict[str, Any]]]]] = {}
         self._initialized = False
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         if self._initialized:
             return
 
-        if LLAMAINDEX_AVAILABLE:
-            await self._init_llamaindex()
-        else:
-            await self._init_fallback()
+        from retrieval.query_engines import (
+            query_bm25,
+            query_graph,
+            query_hybrid,
+            query_vector,
+        )
 
-        self._initialized = True
-
-    async def _init_llamaindex(self):
-        """Build LlamaIndex VectorStoreIndex backed by Qdrant."""
-        try:
-            from llama_index.vector_stores.qdrant import QdrantVectorStore
-            from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-            from llama_index.core import Settings
-            from embedding.qdrant_client import get_qdrant_client
-            import qdrant_client
-
-            embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            Settings.embed_model = embed_model
-
-            qdrant = get_qdrant_client()
-            vector_store = QdrantVectorStore(
-                client=qdrant.client,
-                collection_name="synapse_nodes",
-            )
-            self._vector_index = VectorStoreIndex.from_vector_store(vector_store)
-            logger.info("LlamaIndex VectorStoreIndex connected to Qdrant synapse_nodes")
-        except Exception as e:
-            logger.warning(f"LlamaIndex VectorStoreIndex init failed: {e}")
-            self._vector_index = None
-
-    async def _init_fallback(self):
-        """Fallback to hand-rolled retrieval when LlamaIndex unavailable."""
-        from retrieval.query_engines import query_vector, query_bm25, query_graph, query_hybrid
-        self._query_engines = {
+        self._engines = {
             "vector": query_vector,
             "bm25": query_bm25,
             "kg": query_graph,
+            "graph": query_graph,
             "hybrid": query_hybrid,
         }
-        logger.info("Fallback retrieval engines initialized (vector + BM25 + KG + Hybrid)")
+        self._initialized = True
+        logger.info("HybridRetrievalEngine ready (vector + BM25 + KG + Hybrid)")
 
-    async def query(self, question: str, strategy: str = "hybrid", limit: int = 10) -> list[dict]:
-        """Execute a retrieval query using the configured strategy."""
+    async def query(
+        self,
+        question: str,
+        strategy: str = "hybrid",
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Run ``question`` through the chosen retrieval ``strategy``.
+
+        Strategies: ``hybrid`` (default), ``vector``, ``bm25``, ``kg``/``graph``.
+        Unknown strategies fall back to ``hybrid``.
+        """
         await self.initialize()
 
-        if LLAMAINDEX_AVAILABLE and self._vector_index:
-            try:
-                retriever = self._vector_index.as_retriever(similarity_top_k=limit)
-                nodes = await retriever.aretrieve(question)
-                return [
-                    {"content": n.get_content()[:500], "score": n.get_score() or 0.0,
-                     "source": "llamaindex_vector"}
-                    for n in nodes
-                ]
-            except Exception as e:
-                logger.warning(f"LlamaIndex query failed: {e}")
+        engine = self._engines.get(strategy)
+        if engine is None:
+            logger.warning(
+                "Unknown retrieval strategy %r; falling back to hybrid", strategy
+            )
+            engine = self._engines["hybrid"]
 
-        # Fallback path
-        if strategy == "hybrid":
-            hybrid_func = self._query_engines.get("hybrid")
-            if hybrid_func:
-                return await hybrid_func(question, limit=limit)
-        elif strategy == "vector":
-            vec_func = self._query_engines.get("vector")
-            if vec_func:
-                return await vec_func(question, limit=limit)
-        elif strategy == "bm25":
-            bm25_func = self._query_engines.get("bm25")
-            if bm25_func:
-                return await bm25_func(question, limit=limit)
-        elif strategy in ("graph", "kg"):
-            kg_func = self._query_engines.get("kg")
-            if kg_func:
-                return await kg_func(question)
-        
-        logger.warning(f"Unrecognized or unsupported fallback retrieval strategy: {strategy}")
-        return []
+        # query_graph takes (entity, max_depth=...) — others take (question, limit=...).
+        if strategy in ("kg", "graph"):
+            return await engine(question)  # type: ignore[arg-type]
+        return await engine(question, limit=limit)  # type: ignore[arg-type]
 
 
 _engine: HybridRetrievalEngine | None = None

@@ -15,8 +15,17 @@ jobs:
       NEO4J_USERNAME:    ${{ secrets.NEO4J_USERNAME }}
       NEO4J_PASSWORD:    ${{ secrets.NEO4J_PASSWORD }}
       NEO4J_DATABASE:    ${{ secrets.NEO4J_DATABASE }}
-      QDRANT_URL:        ${{ secrets.QDRANT_URL }}
-      QDRANT_API_KEY:    ${{ secrets.QDRANT_API_KEY }}
+      GROQ_API_KEYS:     ${{ secrets.GROQ_API_KEYS }}
+      POSTGRES_URL:      ${{ secrets.POSTGRES_URL }}
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION:        ${{ secrets.AWS_REGION }}
+      DYNAMODB_TABLE:    ${{ secrets.DYNAMODB_TABLE }}
+      SQS_QUEUE_URL:     ${{ secrets.SQS_QUEUE_URL }}
+      CORS_ORIGINS:      http://localhost:5173
+      LOG_LEVEL:         INFO
+      DEFAULT_DOMAIN:    ai
 
     steps:
       - uses: actions/checkout@v4

@@ -23,6 +23,7 @@ sources:
     rate_limit:
       requests_per_hour: 1000
     auth_required: false
+    auth_env_var: HF_TOKEN
     entity_coverage:
       - Paper
 
@@ -32,6 +33,7 @@ sources:
     rate_limit:
       requests_per_hour: 1000
     auth_required: false
+    auth_env_var: HF_TOKEN
     entity_coverage:
       - Model
       - Organization
@@ -46,6 +48,7 @@ sources:
     rate_limit:
       requests_per_hour: 1000
     auth_required: false
+    auth_env_var: HF_TOKEN
     entity_coverage:
       - Model
       - Organization

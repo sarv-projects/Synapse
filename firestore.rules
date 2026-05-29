@@ -1,0 +1,50 @@
+// Firestore security rules for SYNAPSE.
+//
+// Deploy with: firebase deploy --only firestore:rules
+//
+// IMPORTANT — read this before changing rules:
+// ----------------------------------------------------------------------------
+// SYNAPSE accesses Firestore only from the Cloud Run backend using Application
+// Default Credentials (the Cloud Run runtime service account). Backend SDK
+// access bypasses these rules entirely; access is governed by IAM, not rules.
+//
+// Required IAM grant on the Cloud Run runtime SA:
+//   roles/datastore.user        # read/write Firestore documents
+//
+// Grant it once with:
+//
+//   PROJECT_ID=your-gcp-project
+//   RUNTIME_SA="${PROJECT_ID}-compute@developer.gserviceaccount.com"
+//   # (or your custom Cloud Run SA)
+//   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+//     --member="serviceAccount:${RUNTIME_SA}" \
+//     --role="roles/datastore.user"
+//
+// These rules close off all client SDK access (web/mobile). The frontend never
+// talks to Firestore directly — it goes through the FastAPI backend — so a
+// blanket deny is safe and is the recommended secure default.
+// ----------------------------------------------------------------------------
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // SYNAPSE-owned collections — write/read only via backend (IAM, ADC).
+    // Block all client SDK traffic explicitly so a misconfigured frontend
+    // can never read or mutate checkpoints.
+    match /reasoning_checkpoints/{doc=**} {
+      allow read, write: if false;
+    }
+    match /ingestion_checkpoints/{doc=**} {
+      allow read, write: if false;
+    }
+    match /webhook_deliveries/{doc=**} {
+      allow read, write: if false;
+    }
+
+    // Catch-all deny. Anything not matched above is also denied to client SDKs.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -18,6 +18,7 @@ class ReasoningState(TypedDict, total=False):
     # Retrieval output
     retrieval_context: list[dict[str, Any]]
     retrieval_confidence: float
+    retrieval_confidence_threshold: float
     web_results: list[dict[str, Any]]
     web_research_used: bool
 

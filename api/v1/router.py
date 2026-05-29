@@ -58,6 +58,10 @@ async def health():
             if row3:
                 result["nodes_with_embeddings"] = row3["c"]
         await client.close()
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Health check failed: {e}", exc_info=True)
         result["status"] = "degraded"
@@ -102,6 +106,10 @@ async def whats_new(days: int = Query(default=1, ge=1, le=30)):
 
         await client.close()
         return {"days": days, "entities": entities, "recent": recent}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Whats-new query failed: {e}", exc_info=True)
         await client.close()
@@ -177,6 +185,10 @@ async def search(
 
         await client.close()
         return {"results": results, "next_cursor": None, "total_hint": len(results)}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Search query failed: {e}", exc_info=True)
         await client.close()
@@ -185,14 +197,14 @@ async def search(
 
 @router.get("/similar")
 async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
-    """Top-k semantically similar nodes via Qdrant."""
+    """Top-k semantically similar nodes via pgvector."""
     from embedding.qdrant_client import get_qdrant_client
     from ingestion.neo4j.client import Neo4jClient
     from schema.config import get_settings
 
     settings = get_settings()
     client = Neo4jClient.from_settings(settings)
-    qdrant = get_qdrant_client()
+    store = get_qdrant_client()
 
     try:
         async with client.session() as session:
@@ -212,7 +224,7 @@ async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
                 await client.close()
                 return {"similar": [], "error": "Entity has no embedding"}
 
-            similar_items = qdrant.search_similar(
+            similar_items = await store.search_similar_async(
                 query_vector=embedding,
                 limit=k + 1,
                 score_threshold=0.7,
@@ -240,6 +252,10 @@ async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
 
         await client.close()
         return {"similar": results, "query_id": id}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Similar query failed: {e}", exc_info=True)
         await client.close()
@@ -329,6 +345,10 @@ async def diff(
 
         await client.close()
         return {"added": added, "removed": removed, "from": from_date, "to": to_date}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Diff query failed: {e}", exc_info=True)
         await client.close()
@@ -393,6 +413,10 @@ async def leaderboard(
 
         await client.close()
         return {"type": type, "items": items, "count": len(items)}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Leaderboard query failed: {e}", exc_info=True)
         await client.close()
@@ -426,6 +450,10 @@ async def changelog():
 
         await client.close()
         return {"entries": entries}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Changelog query failed: {e}", exc_info=True)
         await client.close()
@@ -523,6 +551,10 @@ async def technique_ecosystem(name: str = Path(...)):
 
         await client.close()
         return {"name": name, "nodes": nodes, "edges": edges}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Technique ecosystem query failed: {e}", exc_info=True)
         await client.close()
@@ -568,6 +600,10 @@ async def org_releases(name: str = Path(...), since: Optional[str] = Query(defau
 
         await client.close()
         return {"org": name, "items": items, "count": len(items)}
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Org releases query failed: {e}", exc_info=True)
         await client.close()
@@ -606,6 +642,10 @@ async def model_lineage(hf_id: str = Path(...)):
 
         await client.close()
         return dict(row)
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Model lineage query failed: {e}", exc_info=True)
         await client.close()
@@ -633,6 +673,10 @@ async def nl_query(body: NLQueryRequest):
             use_cache=body.use_cache,
         )
         return result
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"NL query failed: {e}", exc_info=True)
         return {
@@ -655,6 +699,10 @@ async def query_suggestions(q: Optional[str] = Query(default="")):
         translator = get_nl_translator()
         suggestions = await translator.get_query_suggestions(q or "")
         return suggestions
+    except HTTPException:
+        # Preserve FastAPI's intended 4xx response — don't let it get
+        # rewritten as a 200 by the catch-all below.
+        raise
     except Exception as e:
         logger.error(f"Query suggestions failed: {e}", exc_info=True)
         return [

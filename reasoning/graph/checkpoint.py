@@ -1,115 +1,84 @@
-"""LangGraph PostgreSQL checkpoint persistence — 7-day TTL, 3 logical checkpoints."""
+"""LangGraph reasoning checkpoint backed by Firestore — replaces PostgreSQL version."""
+import json
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_db = None
+
+
+def _get_db():
+    global _db
+    if _db is None:
+        from google.cloud.firestore_v1 import AsyncClient
+        project = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT")
+        _db = AsyncClient(project=project) if project else AsyncClient()
+    return _db
+
 
 class LangGraphCheckpoint:
-    """Persists LangGraph session state to PostgreSQL at logical checkpoints."""
+    """Firestore-backed checkpoint for LangGraph reasoning sessions."""
 
     def __init__(self):
-        self._pool = None
-        self._connected = False
+        self._db = None
 
     async def connect(self):
-        try:
-            import asyncpg
-            from schema.config import get_settings
-            settings = get_settings()
-            postgres_url = settings.postgres_url
-            if not postgres_url:
-                logger.info("No POSTGRES_URL configured; checkpoints disabled")
-                return
-            self._pool = await asyncpg.create_pool(postgres_url, min_size=1, max_size=3)
-            await self._create_tables()
-            self._connected = True
-            logger.info("LangGraph checkpoints connected to PostgreSQL")
-        except ImportError:
-            logger.info("asyncpg not installed; checkpoints disabled")
-        except Exception as e:
-            logger.warning(f"LangGraph checkpoints unavailable: {e}")
+        self._db = _get_db()
+        logger.info("FirestoreCheckpoint (reasoning): connected")
 
-    async def _create_tables(self):
-        async with self._pool.acquire() as conn:
-            await conn.execute("""
-                CREATE TABLE IF NOT EXISTS langgraph_checkpoints (
-                    session_id TEXT NOT NULL,
-                    checkpoint_name TEXT NOT NULL,
-                    state JSONB NOT NULL,
-                    created_at TIMESTAMPTZ DEFAULT NOW(),
-                    PRIMARY KEY (session_id, checkpoint_name)
-                )
-            """)
-            await conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_checkpoint_created
-                ON langgraph_checkpoints (created_at)
-            """)
-
-    async def save(self, session_id: str, checkpoint_name: str, state: dict):
-        if not self._connected:
+    async def save(self, session_id: str, node_name: str, state: dict[str, Any]):
+        if not self._db:
             return
         try:
-            import json
-            async with self._pool.acquire() as conn:
-                await conn.execute(
-                    """INSERT INTO langgraph_checkpoints (session_id, checkpoint_name, state, created_at)
-                       VALUES ($1, $2, $3::jsonb, NOW())
-                       ON CONFLICT (session_id, checkpoint_name)
-                       DO UPDATE SET state = $3::jsonb, created_at = NOW()""",
-                    session_id, checkpoint_name, json.dumps(state, default=str),
-                )
+            doc_id = f"{session_id}_{node_name}"
+            await self._db.collection("reasoning_checkpoints").document(doc_id).set({
+                "session_id": session_id,
+                "node_name": node_name,
+                "state": json.dumps(state, default=str),
+                "saved_at": datetime.now(UTC).isoformat(),
+            })
         except Exception as e:
-            logger.debug(f"Checkpoint save failed: {e}")
+            logger.debug(f"Reasoning checkpoint save failed: {e}")
 
-    async def load(self, session_id: str, checkpoint_name: str) -> dict | None:
-        if not self._connected:
+    async def load(self, session_id: str, node_name: str) -> dict[str, Any] | None:
+        if not self._db:
             return None
         try:
-            import json
-            async with self._pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    "SELECT state FROM langgraph_checkpoints WHERE session_id = $1 AND checkpoint_name = $2",
-                    session_id, checkpoint_name,
-                )
-                if row:
-                    return json.loads(row["state"])
+            doc_id = f"{session_id}_{node_name}"
+            snap = await self._db.collection("reasoning_checkpoints").document(doc_id).get()
+            if snap.exists:
+                data = snap.to_dict()
+                return json.loads(data.get("state", "{}"))
         except Exception as e:
-            logger.debug(f"Checkpoint load failed: {e}")
+            logger.debug(f"Reasoning checkpoint load failed: {e}")
         return None
 
-    async def cleanup_old(self):
-        """Remove checkpoints older than 7 days."""
-        if not self._connected:
+    async def cleanup_old(self, days: int = 7):
+        if not self._db:
             return
         try:
-            cutoff = datetime.now(UTC) - timedelta(days=7)
-            async with self._pool.acquire() as conn:
-                result = await conn.execute(
-                    "DELETE FROM langgraph_checkpoints WHERE created_at < $1", cutoff
-                )
-                if result and "DELETE" in result:
-                    logger.info(f"Checkpoint cleanup: {result}")
+            cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+            docs = self._db.collection("reasoning_checkpoints").where(
+                "saved_at", "<", cutoff
+            ).stream()
+            async for doc in docs:
+                await doc.reference.delete()
+            logger.info(f"Cleaned up reasoning checkpoints older than {days} days")
         except Exception as e:
-            logger.debug(f"Checkpoint cleanup failed: {e}")
+            logger.debug(f"Reasoning checkpoint cleanup failed: {e}")
 
     async def close(self):
-        if self._pool:
-            try:
-                await self._pool.close()
-            except Exception as e:
-                logger.error(f"Failed to close checkpoint pool: {e}", exc_info=True)
-            finally:
-                self._pool = None
-                self._connected = False
+        pass
 
 
-_checkpoint: LangGraphCheckpoint | None = None
+_store: LangGraphCheckpoint | None = None
 
 
 def get_checkpoint_store() -> LangGraphCheckpoint:
-    global _checkpoint
-    if _checkpoint is None:
-        _checkpoint = LangGraphCheckpoint()
-    return _checkpoint
+    global _store
+    if _store is None:
+        _store = LangGraphCheckpoint()
+    return _store

@@ -6,7 +6,7 @@ Stages:
   2. Fast-path extraction → GraphNode objects
   3. Relationship extraction → GraphEdge objects
   4. MERGE nodes + edges into Neo4j (batched, idempotent)
-  5. Generate embeddings → Qdrant + Neo4j
+  5. Generate embeddings → pgvector + Neo4j
   6. Semantic similarity pass → SEMANTICALLY_SIMILAR edges
   7. Webhook dispatch → notify subscribers
   8. Print run summary

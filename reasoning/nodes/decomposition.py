@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 async def decomposition_node(state: ReasoningState) -> ReasoningState:
-    state.current_node = "decomposition"
+    state["current_node"] = "decomposition"
 
     provider = GroqProvider("openai/gpt-oss-20b")
     assembler = PromptAssembler()
 
     task = f"""Decompose this analytical query into sub-questions and search queries:
 
-QUERY: {state.query}
+QUERY: {state['query']}
 
 Generate a JSON object with:
 - sub_questions: list of strings (ranked by dependency order, 3-7 questions)
@@ -35,19 +35,19 @@ Return ONLY valid JSON. No markdown, no prose."""
     try:
         result = await provider.generate(prompt, config)
         parsed = json.loads(result.content)
-        state.sub_questions = parsed.get("sub_questions", [state.query])
-        state.search_queries = parsed.get("search_queries", [{"query": state.query, "type": "direct", "priority": 1}])
-        state.retrieval_strategy = parsed.get("retrieval_strategy", "hybrid")
-        state.complexity_per_subquestion = parsed.get("complexity_per_subquestion", {})
-        state.merge_strategy = parsed.get("merge_strategy", "ranked")
-        state.model_trace["decomposition"] = "openai/gpt-oss-20b"
-        state.total_tokens_used["decomposition"] = result.input_tokens_used + result.output_tokens_used
-        logger.info(f"Decomposition: {len(state.sub_questions)} sub-questions, {len(state.search_queries)} search queries")
+        state["sub_questions"] = parsed.get("sub_questions", [state["query"]])
+        state["search_queries"] = parsed.get("search_queries", [{"query": state["query"], "type": "direct", "priority": 1}])
+        state["retrieval_strategy"] = parsed.get("retrieval_strategy", "hybrid")
+        state["complexity_per_subquestion"] = parsed.get("complexity_per_subquestion", {})
+        state["merge_strategy"] = parsed.get("merge_strategy", "ranked")
+        state["model_trace"]["decomposition"] = "openai/gpt-oss-20b"
+        state["total_tokens_used"]["decomposition"] = result.input_tokens_used + result.output_tokens_used
+        logger.info(f"Decomposition: {len(state['sub_questions'])} sub-questions, {len(state['search_queries'])} search queries")
     except (json.JSONDecodeError, KeyError) as e:
         logger.warning(f"Decomposition JSON parse failed: {e}. Using fallback decomposition.")
-        state.sub_questions = [state.query]
-        state.search_queries = [{"query": state.query, "type": "direct", "priority": 1}]
-        state.retrieval_strategy = "hybrid"
-        state.model_trace["decomposition"] = "fallback"
+        state["sub_questions"] = [state["query"]]
+        state["search_queries"] = [{"query": state["query"], "type": "direct", "priority": 1}]
+        state["retrieval_strategy"] = "hybrid"
+        state["model_trace"]["decomposition"] = "fallback"
 
     return state

@@ -1,0 +1,72 @@
+{
+  "test": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "arxiv": {
+    "state": "closed",
+    "failure_count": 1,
+    "last_failure_time": "2026-05-29T08:08:38.728700",
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "huggingface_daily_papers": {
+    "state": "closed",
+    "failure_count": 1,
+    "last_failure_time": "2026-05-29T08:08:07.960524",
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "huggingface_trending_models": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "huggingface_hub": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "papers_with_code": {
+    "state": "closed",
+    "failure_count": 1,
+    "last_failure_time": "2026-05-29T08:08:08.532964",
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "github_trending": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "github_repo_content": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "semantic_scholar": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "dair_ai_ml_papers": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  }
+}

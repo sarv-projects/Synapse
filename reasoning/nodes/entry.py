@@ -8,19 +8,22 @@ logger = logging.getLogger(__name__)
 
 
 async def entry_node(state: ReasoningState) -> ReasoningState:
-    state.current_node = "entry"
-    state.status = "PROCESSING"
+    state["current_node"] = "entry"
+    state["status"] = "PROCESSING"
 
-    if not state.session_id:
-        state.session_id = str(uuid.uuid4())
+    if not state.get("session_id"):
+        state["session_id"] = str(uuid.uuid4())
 
     from budget.oracle import get_budget_oracle
+    from schema.config import get_settings
     oracle = get_budget_oracle()
+    settings = get_settings()
     snapshot = oracle.snapshot()
-    state.budget_snapshot = snapshot
+    state["budget_snapshot"] = snapshot
+    state["retrieval_confidence_threshold"] = settings.retrieval_confidence_threshold
 
     # Quick complexity estimation
-    query_len = len(state.query)
+    query_len = len(state["query"])
     if query_len < 100:
         estimated_complexity = "low"
     elif query_len < 500:
@@ -35,13 +38,13 @@ async def entry_node(state: ReasoningState) -> ReasoningState:
     ]
 
     if not models_available:
-        state.status = "FAILED"
-        state.error = "All model budgets exhausted. Try again after rate limit reset."
+        state["status"] = "FAILED"
+        state["error"] = "All model budgets exhausted. Try again after rate limit reset."
         return state
 
     logger.info(
-        f"Entry: session={state.session_id}, complexity={estimated_complexity}, "
-        f"models_available={len(models_available)}, query='{state.query[:80]}...'"
+        f"Entry: session={state.get('session_id')}, complexity={estimated_complexity}, "
+        f"models_available={len(models_available)}, query='{state.get('query', '')[:80]}...'"
     )
 
     return state

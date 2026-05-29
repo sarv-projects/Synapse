@@ -26,7 +26,7 @@ export function Docs() {
               ['GET', '/api/v1/health', 'System health & pipeline status'],
               ['GET', '/api/v1/search?q=&type=&cursor=', 'Full-text + vector search'],
               ['POST', '/api/v1/query', 'Natural language → Cypher'],
-              ['GET', '/api/v1/similar?id=&k=5', 'Semantic similarity (Qdrant)'],
+              ['GET', '/api/v1/similar?id=&k=5', 'Semantic similarity (pgvector)'],
               ['GET', '/api/v1/whats-new?days=1', 'New entities in last N days'],
               ['GET', '/api/v1/diff?from=&to=', 'Temporal diff between dates'],
               ['GET', '/api/v1/export?query=&format=', 'Export subgraph'],

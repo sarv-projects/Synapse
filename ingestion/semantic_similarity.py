@@ -104,10 +104,10 @@ class SemanticSimilarityPass:
         
         for entity in entities:
             try:
-                # Find similar entities using Qdrant
-                similar_entities = self.qdrant_client.search_similar(
+                # Find similar entities using pgvector
+                similar_entities = await self.qdrant_client.search_similar_async(
                     query_vector=entity["embedding"],
-                    limit=self.max_similar_per_entity + 1,  # +1 to account for self
+                    limit=self.max_similar_per_entity + 1,
                     score_threshold=self.similarity_threshold,
                     label_filter=entity_type
                 )
@@ -185,7 +185,7 @@ class SemanticSimilarityPass:
                         r.evidence_source = 'vector_similarity',
                         r.evidence_url = null,
                         r.evidence_snippet = $snippet,
-                        r.extraction_method = 'qdrant_cosine_similarity',
+                        r.extraction_method = 'pgvector_cosine_similarity',
                         r.first_seen = datetime(),
                         r.last_verified = datetime(),
                         r.verification_status = 'verified',
@@ -216,7 +216,7 @@ class SemanticSimilarityPass:
         threshold: float = 0.85
     ) -> List[Dict[str, Any]]:
         """Find entities similar to a query embedding."""
-        similar_items = self.qdrant_client.search_similar(
+        similar_items = await self.qdrant_client.search_similar_async(
             query_vector=query_embedding,
             limit=limit,
             score_threshold=threshold,

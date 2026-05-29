@@ -37,8 +37,8 @@ class WebResearchCache:
         """Look up cached results by query embedding similarity."""
         try:
             from embedding.qdrant_client import get_qdrant_client
-            qdrant = get_qdrant_client()
-            results = qdrant.search_similar(query_embedding, limit=1, score_threshold=similarity_threshold)
+            store = get_qdrant_client()
+            results = await store.search_similar_async(query_embedding, limit=1, score_threshold=similarity_threshold)
             if results:
                 logger.info(f"WebResearchCache: cache hit (score={results[0]['score']:.3f})")
                 return results[0].get("payload", {})

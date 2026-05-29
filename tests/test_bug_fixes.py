@@ -31,10 +31,18 @@ class TestRetrievalLayer:
 
     def test_bm25_import(self):
         from rank_bm25 import BM25Okapi
-        corpus = [["hello", "world"], ["foo", "bar"]]
+        # Use a 3-doc corpus so IDF is nonzero. 'hello' appears in doc 0 only;
+        # 'common' appears in all docs, so its IDF is low. Doc 0 must score
+        # highest for the query "hello".
+        corpus = [
+            ["hello", "world", "common"],
+            ["foo", "bar", "common"],
+            ["baz", "qux", "common"],
+        ]
         bm25 = BM25Okapi(corpus)
         scores = bm25.get_scores(["hello"])
         assert scores[0] > scores[1]
+        assert scores[0] > scores[2]
 
     def test_query_engines_importable(self):
         from retrieval.query_engines import query_vector, query_bm25, query_graph, query_hybrid
@@ -50,7 +58,7 @@ class TestCircuitBreakerNoRecursion:
     @pytest.mark.asyncio
     async def test_protected_fetcher_calls_parent(self):
         from ingestion.circuit_breaker_wrapper import circuit_breaker_protected
-        from ingestion.sources.base import SourceFetcher, SourceDocument
+        from ingestion.sources.base import SourceFetcher
 
         call_count = 0
 
@@ -60,19 +68,20 @@ class TestCircuitBreakerNoRecursion:
                 self.source_name = "test"
 
             async def fetch(self):
-                # This should NOT be called (the decorator overrides it)
-                pass
-
-            async def _raw_fetch(self):
+                # The decorator's _raw_fetch reaches this via super().fetch().
                 nonlocal call_count
                 call_count += 1
                 return []
 
-        # The ProtectedFetcher.fetch() should call _circuit_wrapper.fetch()
-        # which calls _raw_fetch() (super().fetch()), not self.fetch()
+        # ProtectedFetcher.fetch() -> CircuitBreakerWrapper.fetch()
+        #   -> _fetch_with_backoff()
+        #     -> self.fetcher._raw_fetch()
+        #       -> super().fetch()  i.e. TestFetcher.fetch above
+        # If recursion bug returns, this hangs / RecursionError.
         fetcher = TestFetcher()
         result = await fetcher.fetch()
         assert isinstance(result, list)
+        assert call_count == 1, f"parent fetch should be invoked exactly once, was {call_count}"
 
 
 class TestBudgetSemaphoreRelease:

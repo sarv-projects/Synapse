@@ -216,7 +216,7 @@ export function Dashboard() {
                 </div>
                 <div className="ml-auto flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
-                  <span className="text-xs text-gray-400">Powered by Neo4j · Groq · Qdrant</span>
+                  <span className="text-xs text-gray-400">Powered by Neo4j · Groq · pgvector</span>
                 </div>
               </>
           }

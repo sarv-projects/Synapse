@@ -1,1 +1,53 @@
 
+{"timestamp": "2026-05-28T07:22:56.665243+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T07:22:56.668247+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-28T07:38:56.254722+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T07:38:56.255278+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-28T08:18:24.073215+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T08:18:24.075715+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-28T08:20:46.058960+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T08:20:46.059677+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-28T08:25:30.694973+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T08:25:30.695513+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-28T08:38:10.892383+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T08:38:10.892861+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-28T08:38:36.029331+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-28T08:38:36.029838+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-29T06:33:50.775378+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-29T06:33:50.777059+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-29T06:35:03.708979+00:00", "url": "https://dev.to/sylwia-lask/how-are-developers-actually-using-ai-at-work-4g9c", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 103}}
+{"timestamp": "2026-05-29T06:35:03.709287+00:00", "url": "https://dev.to/jasmin/an-llm-api-call-in-4-gifs-33b1", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 101}}
+{"timestamp": "2026-05-29T06:35:03.709329+00:00", "url": "https://dev.to/mickyarun/ai-agents-are-great-at-80-of-our-code-the-other-20-is-why-we-still-need-seniors-3lh5", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 104}}
+{"timestamp": "2026-05-29T06:35:03.709351+00:00", "url": "https://dev.to/michellebuchiokonicha/i-just-published-part-1-of-the-machine-learning-engineering-series-where-i-break-down-the-full-3g6", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 98}}
+{"timestamp": "2026-05-29T06:35:03.709371+00:00", "url": "https://dev.to/michellebuchiokonicha/the-machine-learning-engineering-series-3anj", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 93}}
+{"timestamp": "2026-05-29T06:35:03.709388+00:00", "url": "https://dev.to/nimay_04/rag-is-not-always-the-answer-anymore-how-ai-agents-search-code-in-2026-43m3", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 106}}
+{"timestamp": "2026-05-29T06:35:03.709405+00:00", "url": "https://backchannel.com/an-exclusive-look-at-how-ai-and-machine-learning-work-at-apple-8dbfb131932b", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 116}}
+{"timestamp": "2026-05-29T06:35:03.709419+00:00", "url": "https://blogs.nvidia.com/blog/2016/07/29/whats-difference-artificial-intelligence-machine-learning-deep-learning-ai/", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 133}}
+{"timestamp": "2026-05-29T06:35:03.709451+00:00", "url": "https://spectrum.ieee.org/the-institute/ieee-member-news/stop-calling-everything-ai-machinelearning-pioneer-says", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 129}}
+{"timestamp": "2026-05-29T06:35:03.709464+00:00", "url": "https://arstechnica.com/tech-policy/2017/10/eff-stupid-patents-are-dragging-down-ai-and-machine-learning/", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 122}}
+{"timestamp": "2026-05-29T06:35:03.709478+00:00", "url": "https://www.eff.org/deeplinks/2017/06/help-eff-track-progress-ai-and-machine-learning", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 102}}
+{"timestamp": "2026-05-29T06:35:56.416812+00:00", "url": "https://towardsdatascience.com/why-ai-still-cant-solve-your-real-mathematical-optimization-problem-and-what-orpilot-does-differently/", "gate": 2, "reason": "Domain relevance low: 0 keywords", "metadata": {"keyword_hits": 0}}
+{"timestamp": "2026-05-29T06:35:56.431527+00:00", "url": "https://pub.towardsai.net/i-tried-10-ai-agent-frameworks-in-2026-heres-the-honest-guide-i-wish-i-had-earlier-16da216282da?source=rss----98111c9905da---4", "gate": 2, "reason": "Domain relevance low: 0 keywords", "metadata": {"keyword_hits": 0}}
+{"timestamp": "2026-05-29T06:35:56.509032+00:00", "url": "https://pub.towardsai.net/i-tested-opus-4-8-vs-gpt-5-5-vs-gemini-3-1-pro-on-20-tasks-opus-embarrassed-both-on-long-context-00a1092ad365?source=rss----98111c9905da---4", "gate": 2, "reason": "Domain relevance low: 1 keywords", "metadata": {"keyword_hits": 1}}
+{"timestamp": "2026-05-29T06:35:56.777618+00:00", "url": "https://github.com/huggingface/transformers", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 172}}
+{"timestamp": "2026-05-29T06:35:56.998696+00:00", "url": "https://github.com/josephmisiti/awesome-machine-learning", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 78}}
+{"timestamp": "2026-05-29T06:35:56.998941+00:00", "url": "https://github.com/scikit-learn/scikit-learn", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 40}}
+{"timestamp": "2026-05-29T06:35:56.999009+00:00", "url": "https://github.com/gradio-app/gradio", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 92}}
+{"timestamp": "2026-05-29T06:35:56.999061+00:00", "url": "https://www.interconnects.ai/p/some-ideas-for-what-comes-next-may", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 110}}
+{"timestamp": "2026-05-29T06:35:56.999102+00:00", "url": "https://www.interconnects.ai/p/latest-open-artifacts-21-open-model", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 57}}
+{"timestamp": "2026-05-29T06:35:56.999185+00:00", "url": "https://thegradient.pub/virtue-ethics-ai-alignment/", "gate": 2, "reason": "Domain relevance low: 1 keywords", "metadata": {"keyword_hits": 1}}
+{"timestamp": "2026-05-29T06:35:56.999261+00:00", "url": "https://thegradient.pub/agi-is-not-multimodal/", "gate": 2, "reason": "Domain relevance low: 1 keywords", "metadata": {"keyword_hits": 1}}
+{"timestamp": "2026-05-29T06:35:56.999312+00:00", "url": "https://newsletter.theaiedge.io/p/adalflow-a-pytorch-like-framework", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 76}}
+{"timestamp": "2026-05-29T06:35:56.999356+00:00", "url": "https://newsletter.theaiedge.io/p/last-week-to-register-build-production", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 20}}
+{"timestamp": "2026-05-29T06:35:56.999499+00:00", "url": "https://aiweekly.co/issues/anthropics-pentagon-model-is-now-everyones-model", "gate": 2, "reason": "Domain relevance low: 1 keywords", "metadata": {"keyword_hits": 1}}
+{"timestamp": "2026-05-29T06:35:56.999664+00:00", "url": "https://aiweekly.co/issues/musk-zuckerberg-killed-trumps-ai-safety-order-in-three", "gate": 2, "reason": "Domain relevance low: 0 keywords", "metadata": {"keyword_hits": 0}}
+{"timestamp": "2026-05-29T06:35:56.999781+00:00", "url": "https://openai.com/index/endava", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 148}}
+{"timestamp": "2026-05-29T06:35:56.999837+00:00", "url": "https://openai.com/index/openai-frontier-governance-framework", "gate": 1, "reason": "Content too short or empty", "metadata": {"length": 149}}
+{"timestamp": "2026-05-29T06:39:51.530714+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-29T06:39:51.531340+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-29T08:23:25.508288+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-29T08:23:25.510473+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-29T08:30:04.970437+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-29T08:30:04.971982+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-29T08:34:05.752475+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-29T08:34:05.754862+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}

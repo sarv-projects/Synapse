@@ -25,36 +25,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.rpm = requests_per_minute
         self.clients: dict[str, list[float]] = defaultdict(list)
         self.last_pruned = time.time()
-        self._prune_task: asyncio.Task[None] | None = None
         global _rate_limiter_instance
         _rate_limiter_instance = self
 
     async def start(self):
-        """Start the periodic prune background task."""
-        if self._prune_task is None or self._prune_task.done():
-            self._prune_task = asyncio.create_task(self._periodic_prune())
+        """No-op for backward compatibility."""
+        pass
 
     async def stop(self):
-        """Cancel the periodic prune background task."""
-        if self._prune_task and not self._prune_task.done():
-            _ = self._prune_task.cancel()
-            try:
-                await self._prune_task
-            except asyncio.CancelledError:
-                pass
-            self._prune_task = None
-
-    async def _periodic_prune(self):
-        while True:
-            await asyncio.sleep(300)
-            now = time.time()
-            self.last_pruned = now
-            expired_ips = [ip for ip, reqs in self.clients.items() if not reqs or now - reqs[-1] > 3600]
-            for ip in expired_ips:
-                try:
-                    del self.clients[ip]
-                except KeyError:
-                    pass
+        """No-op for backward compatibility."""
+        pass
 
     async def dispatch(self, request: Request, call_next: Callable):
         # Never rate-limit health or docs
@@ -63,6 +43,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         client_ip = request.client.host if request.client else "unknown"
         now = time.time()
+
+        # Lazily prune expired clients every 5 minutes during requests
+        # to avoid memory leaks without running background tasks.
+        if now - self.last_pruned > 300:
+            self.last_pruned = now
+            expired_ips = [ip for ip, reqs in self.clients.items() if not reqs or now - reqs[-1] > 3600]
+            for ip in expired_ips:
+                self.clients.pop(ip, None)
 
         # Slide the window
         self.clients[client_ip] = [t for t in self.clients[client_ip] if now - t < 60]

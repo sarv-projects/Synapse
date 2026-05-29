@@ -34,7 +34,10 @@ class CircuitBreakerWrapper:
         try:
             result = await self._fetch_with_backoff()
             self.circuit_breaker.record_success()
-            return result
+            # Defensive coercion: a fetcher that forgets to `return` would
+            # otherwise leak `None` into downstream pipeline stages that
+            # expect an iterable.
+            return result if result is not None else []
         except Exception as e:
             logger.error(f"Fetch failed for {self.source_name}: {e}")
             self.circuit_breaker.record_failure()

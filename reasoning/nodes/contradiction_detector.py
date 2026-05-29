@@ -16,11 +16,11 @@ except ImportError:
 
 async def run_contradiction_detector_crewai(state: ReasoningState) -> ReasoningState:
     """Run contradiction detection using CrewAI agent scaffolding."""
-    if not CREWAI_AVAILABLE or not state.claim_evidence_map:
+    if not CREWAI_AVAILABLE or not state.get("claim_evidence_map"):
         return await _run_plain_node(state)
 
     try:
-        claims_json = json.dumps(state.claim_evidence_map[:15], indent=2)
+        claims_json = json.dumps(state.get("claim_evidence_map", [])[:15], indent=2)
 
         detector = Agent(
             role="Contradiction Detector",
@@ -50,18 +50,18 @@ async def run_contradiction_detector_crewai(state: ReasoningState) -> ReasoningS
         raw = str(result)
         try:
             parsed = json.loads(raw)
-            state.contradiction_flags = parsed.get("contradictions", [])
+            state["contradiction_flags"] = parsed.get("contradictions", [])
         except json.JSONDecodeError:
             import re
             match = re.search(r'\{[\s\S]*\}', raw)
             if match:
                 parsed = json.loads(match.group())
-                state.contradiction_flags = parsed.get("contradictions", [])
+                state["contradiction_flags"] = parsed.get("contradictions", [])
             else:
-                state.contradiction_flags = []
+                state["contradiction_flags"] = []
 
-        state.model_trace["contradiction_detector"] = "crewai:meta-llama/llama-4-scout-17b-16e-instruct"
-        logger.info(f"CrewAI contradiction detector: {len(state.contradiction_flags)} contradictions found")
+        state["model_trace"]["contradiction_detector"] = "crewai:meta-llama/llama-4-scout-17b-16e-instruct"
+        logger.info(f"CrewAI contradiction detector: {len(state.get('contradiction_flags', []))} contradictions found")
         return state
 
     except Exception as e:
@@ -77,16 +77,16 @@ async def _run_plain_node(state: ReasoningState) -> ReasoningState:
 
     provider = GroqProvider("meta-llama/llama-4-scout-17b-16e-instruct")
     assembler = PromptAssembler()
-    claims_json = json.dumps(state.claim_evidence_map[:15], indent=2)
+    claims_json = json.dumps(state.get("claim_evidence_map", [])[:15], indent=2)
     task = f"Compare these claims for contradictions:\n\n{claims_json}"
     prompt = assembler.assemble_json("contradiction_detector", task)
     config = InferenceConfig(max_tokens=1000, temperature=0.1, response_format="json")
     try:
         result = await provider.generate(prompt, config)
         parsed = json.loads(result.content)
-        state.contradiction_flags = parsed.get("contradictions", [])
-        state.total_tokens_used["contradiction_detector"] = result.input_tokens_used + result.output_tokens_used
+        state["contradiction_flags"] = parsed.get("contradictions", [])
+        state["total_tokens_used"]["contradiction_detector"] = result.input_tokens_used + result.output_tokens_used
     except Exception:
-        state.contradiction_flags = []
-    state.model_trace["contradiction_detector"] = "meta-llama/llama-4-scout-17b-16e-instruct"
+        state["contradiction_flags"] = []
+    state["model_trace"]["contradiction_detector"] = "meta-llama/llama-4-scout-17b-16e-instruct"
     return state

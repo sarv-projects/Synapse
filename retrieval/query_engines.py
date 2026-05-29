@@ -13,16 +13,16 @@ def _tokenize(text: str) -> list[str]:
 
 
 async def query_vector(question: str, limit: int = 10, score_threshold: float = 0.7) -> list[dict[str, Any]]:
-    """Vector similarity search via Qdrant using sentence-transformers embeddings."""
+    """Vector similarity search via pgvector using sentence-transformers embeddings."""
     try:
         from embedding.generator import get_embedding_generator
         from embedding.qdrant_client import get_qdrant_client
 
         gen = await get_embedding_generator()
-        qdrant = get_qdrant_client()
+        store = get_qdrant_client()
 
         query_embedding = gen.generate_query_embedding(question)
-        results = qdrant.search_similar(
+        results = await store.search_similar_async(
             query_vector=query_embedding,
             limit=limit,
             score_threshold=score_threshold,
@@ -34,8 +34,8 @@ async def query_vector(question: str, limit: int = 10, score_threshold: float = 
                 "label": r.get("payload", {}).get("label", ""),
                 "content": r.get("payload", {}).get("name", ""),
                 "score": r.get("score", 0.0),
-                "source": "qdrant_vector",
-                "retrieval_source": "qdrant_vector",
+                "source": "pgvector",
+                "retrieval_source": "pgvector",
             }
             for r in results
         ]

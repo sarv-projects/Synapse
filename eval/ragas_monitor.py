@@ -15,6 +15,7 @@ try:
         AnswerRelevancy,
         ContextPrecision,
         ContextRecall,
+        FactualCorrectness,
     )
     from ragas.llms import LangchainLLMWrapper
     from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -24,7 +25,6 @@ except ImportError:
 
 
 def _get_ragas_llm():
-    """Create a LangChain Groq LLM wrapped for RAGAS evaluation."""
     from langchain_groq import ChatGroq
     from schema.config import get_settings
     settings = get_settings()
@@ -36,7 +36,6 @@ def _get_ragas_llm():
 
 
 def _get_ragas_embeddings():
-    """Create a HuggingFace embedding wrapper for RAGAS."""
     from langchain_huggingface import HuggingFaceEmbeddings
     embeddings = HuggingFaceEmbeddings(model_name="thenlper/gte-small")
     return LangchainEmbeddingsWrapper(embeddings)
@@ -61,8 +60,6 @@ class RagasMonitor:
 
     def __init__(self):
         self.scores: list[EvalScore] = []
-        self._llm = None
-        self._embeddings = None
 
     @property
     def total_runs(self) -> int:
@@ -97,11 +94,11 @@ class RagasMonitor:
         query: str,
         answer: str,
         contexts: list[str],
+        reference: str = "",
         retrieval_confidence: float = 0.0,
         total_tokens: int = 0,
         model_trace: dict[str, str] | None = None,
     ) -> EvalScore:
-        """Run RAGAS evaluation on a pipeline result."""
         score = EvalScore(
             query=query,
             retrieval_confidence=retrieval_confidence,
@@ -124,19 +121,18 @@ class RagasMonitor:
                 user_input=query,
                 response=answer,
                 retrieved_contexts=contexts,
-                reference="",
+                reference=reference or None,
             )
             dataset = EvaluationDataset(samples=[sample])
 
             llm = _get_ragas_llm()
             embeddings = _get_ragas_embeddings()
 
-            metrics = [
-                Faithfulness(),
-                AnswerRelevancy(),
-                ContextPrecision(),
-                ContextRecall(),
-            ]
+            # ContextRecall and FactualCorrectness require a non-empty reference
+            has_reference = bool(reference and reference.strip())
+            metrics = [Faithfulness(), AnswerRelevancy(), ContextPrecision()]
+            if has_reference:
+                metrics += [ContextRecall(), FactualCorrectness()]
 
             result = evaluate(
                 dataset=dataset,
@@ -151,13 +147,16 @@ class RagasMonitor:
                 score.faithfulness = float(row.get("faithfulness", 0) or 0)
                 score.answer_relevancy = float(row.get("answer_relevancy", 0) or 0)
                 score.context_precision = float(row.get("context_precision", 0) or 0)
-                score.context_recall = float(row.get("context_recall", 0) or 0)
+                if has_reference:
+                    score.context_recall = float(row.get("context_recall", 0) or 0)
+                    score.factual_correctness = float(row.get("factual_correctness", 0) or 0)
 
             logger.info(
                 f"RAGAS eval: faithfulness={score.faithfulness:.2f} "
                 f"relevancy={score.answer_relevancy:.2f} "
                 f"precision={score.context_precision:.2f} "
-                f"recall={score.context_recall:.2f}"
+                f"recall={score.context_recall:.2f} "
+                f"factual_correctness={score.factual_correctness:.2f}"
             )
         except Exception as e:
             logger.warning(f"RAGAS evaluation failed: {e}")
@@ -185,6 +184,7 @@ class RagasMonitor:
                     "relevancy": round(s.answer_relevancy, 3),
                     "precision": round(s.context_precision, 3),
                     "recall": round(s.context_recall, 3),
+                    "factual_correctness": round(s.factual_correctness, 3),
                     "timestamp": s.timestamp,
                 }
                 for s in self.scores[-10:]
