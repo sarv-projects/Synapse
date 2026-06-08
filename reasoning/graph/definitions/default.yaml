@@ -56,15 +56,13 @@ edges:
     to: retrieval
     budget_gate: false
 
-  - from: retrieval
+  - from: decomposition
     to: web_research
     budget_gate: false
-    condition: retrieval_confidence < retrieval_confidence_threshold
 
   - from: retrieval
     to: analysis_crew
     budget_gate: false
-    condition: retrieval_confidence >= retrieval_confidence_threshold
 
   - from: web_research
     to: analysis_crew

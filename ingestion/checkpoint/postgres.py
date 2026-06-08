@@ -18,8 +18,8 @@ def _get_db():
     return _db
 
 
-class PostgresCheckpoint:
-    """Firestore-backed ingestion checkpoint. Interface unchanged from Postgres version."""
+class FirestoreCheckpoint:
+    """Firestore-backed ingestion checkpoint. Replaces the legacy PostgresCheckpoint interface."""
 
     def __init__(self):
         self._db = None
@@ -39,7 +39,7 @@ class PostgresCheckpoint:
                 "metadata": metadata or {},
                 "updated_at": datetime.now(UTC).isoformat(),
             }, merge=True)
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Checkpoint save failed: {e}")
 
     async def get_entity_stage(self, entity_id: str) -> str | None:
@@ -48,7 +48,7 @@ class PostgresCheckpoint:
         try:
             snap = await self._db.collection("ingestion_checkpoints").document(entity_id).get()
             return snap.to_dict().get("stage") if snap.exists else None
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Checkpoint get failed: {e}")
             return None
 
@@ -69,7 +69,7 @@ class PostgresCheckpoint:
                 "error": error,
                 "delivered_at": datetime.now(UTC).isoformat(),
             })
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Webhook log failed: {e}")
 
     async def update_webhook_delivery(self, delivery_id: str, status: str, status_code: int | None = None):
@@ -79,7 +79,7 @@ class PostgresCheckpoint:
             await self._db.collection("webhook_deliveries").document(delivery_id).set(
                 {"status": status, "status_code": status_code}, merge=True
             )
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Webhook update failed: {e}")
 
     async def get_webhook_delivery_stats(self) -> dict[str, Any]:
@@ -91,7 +91,7 @@ class PostgresCheckpoint:
             async for _ in docs:
                 total += 1
             return {"total": total}
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Webhook stats failed: {e}")
             return {}
 
@@ -107,5 +107,5 @@ class PostgresCheckpoint:
             ).stream()
             async for doc in docs:
                 await doc.reference.delete()
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Webhook cleanup failed: {e}")

@@ -40,7 +40,7 @@ class LangGraphCheckpoint:
                 "state": json.dumps(state, default=str),
                 "saved_at": datetime.now(UTC).isoformat(),
             })
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Reasoning checkpoint save failed: {e}")
 
     async def load(self, session_id: str, node_name: str) -> dict[str, Any] | None:
@@ -52,7 +52,7 @@ class LangGraphCheckpoint:
             if snap.exists:
                 data = snap.to_dict()
                 return json.loads(data.get("state", "{}"))
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Reasoning checkpoint load failed: {e}")
         return None
 
@@ -67,7 +67,7 @@ class LangGraphCheckpoint:
             async for doc in docs:
                 await doc.reference.delete()
             logger.info(f"Cleaned up reasoning checkpoints older than {days} days")
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Reasoning checkpoint cleanup failed: {e}")
 
     async def close(self):

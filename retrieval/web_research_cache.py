@@ -17,21 +17,25 @@ class WebResearchCache:
             from ingestion.neo4j.client import Neo4jClient
             from schema.config import get_settings
             client = Neo4jClient.from_settings(get_settings())
-            async with client.session() as s:
-                await s.run("""
-                    MERGE (wr:WebResearchResult {query_text: $query})
-                    SET wr.query_embedding = $embedding,
-                        wr.result_urls = $urls,
-                        wr.content_md = $content,
-                        wr.session_id = $sid,
-                        wr.cached_at = datetime(),
-                        wr.ttl_days = 7,
-                        wr.status = 'active'
-                """, query=query_text, embedding=query_embedding, urls=result_urls, content=content_md[:10000], sid=session_id)
-            await client.close()
+            try:
+                async with client.session() as s:
+                    await s.run("""
+                        MERGE (wr:WebResearchResult {query_text: $query})
+                        SET wr.query_embedding = $embedding,
+                            wr.result_urls = $urls,
+                            wr.content_md = $content,
+                            wr.session_id = $sid,
+                            wr.cached_at = datetime(),
+                            wr.ttl_days = 7,
+                            wr.status = 'active'
+                    """, query=query_text, embedding=query_embedding, urls=result_urls, content=content_md[:10000], sid=session_id)
+            finally:
+                await client.close()
             logger.info(f"WebResearchCache: stored result for '{query_text[:60]}...'")
-        except Exception as e:
-            logger.debug(f"WebResearchCache store failed: {e}")
+        except (ConnectionError, TimeoutError, OSError) as e:
+            logger.debug(f"WebResearchCache store network failure: {type(e).__name__}: {e}")
+        except (TypeError, ValueError) as e:
+            logger.warning(f"WebResearchCache store bad payload: {type(e).__name__}: {e}")
 
     async def lookup(self, query_embedding: list[float], similarity_threshold: float = 0.85) -> dict | None:
         """Look up cached results by query embedding similarity."""
@@ -42,8 +46,10 @@ class WebResearchCache:
             if results:
                 logger.info(f"WebResearchCache: cache hit (score={results[0]['score']:.3f})")
                 return results[0].get("payload", {})
-        except Exception as e:
-            logger.debug(f"WebResearchCache lookup failed: {e}")
+        except (ConnectionError, TimeoutError, OSError) as e:
+            logger.debug(f"WebResearchCache lookup network failure: {type(e).__name__}: {e}")
+        except (TypeError, ValueError) as e:
+            logger.debug(f"WebResearchCache lookup decode failure: {type(e).__name__}: {e}")
         return None
 
     async def cleanup_expired(self):
@@ -52,16 +58,18 @@ class WebResearchCache:
             from ingestion.neo4j.client import Neo4jClient
             from schema.config import get_settings
             client = Neo4jClient.from_settings(get_settings())
-            cutoff = datetime.now(UTC) - timedelta(days=7)
-            async with client.session() as s:
-                await s.run(
-                    "MATCH (wr:WebResearchResult) WHERE wr.cached_at < $cutoff SET wr.status = 'archived'",
-                    cutoff=cutoff.isoformat(),
-                )
-            await client.close()
+            try:
+                cutoff = datetime.now(UTC) - timedelta(days=7)
+                async with client.session() as s:
+                    await s.run(
+                        "MATCH (wr:WebResearchResult) WHERE wr.cached_at < $cutoff SET wr.status = 'archived'",
+                        cutoff=cutoff.isoformat(),
+                    )
+            finally:
+                await client.close()
             logger.info("WebResearchCache: expired entries archived")
-        except Exception as e:
-            logger.debug(f"WebResearchCache cleanup failed: {e}")
+        except (ConnectionError, TimeoutError, OSError) as e:
+            logger.debug(f"WebResearchCache cleanup network failure: {type(e).__name__}: {e}")
 
 
 _cache: WebResearchCache | None = None

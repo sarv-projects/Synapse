@@ -65,3 +65,37 @@
 {"timestamp": "2026-05-29T14:41:47.481708+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
 {"timestamp": "2026-05-29T14:42:05.280978+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
 {"timestamp": "2026-05-29T14:42:05.282010+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-31T12:37:42.537672+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-31T12:37:42.541116+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-05-31T12:40:50.644631+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-05-31T12:40:50.645419+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T14:53:28.789802+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T14:53:28.792586+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T15:21:45.155057+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T15:21:45.156492+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T15:28:49.300687+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T15:28:49.301215+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T15:34:24.713735+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T15:34:24.714320+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:04:01.437044+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:04:01.443895+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:04:47.503746+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:04:47.505571+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:05:33.634785+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:05:33.638730+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:06:22.012004+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:06:22.015003+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:07:46.068270+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:07:46.073740+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:08:32.839580+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:08:32.845106+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:09:21.638927+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:09:21.641027+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:11:52.709254+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:11:52.710158+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:14:37.253706+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:14:37.255730+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:18:29.560426+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:18:29.562221+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}
+{"timestamp": "2026-06-02T17:20:13.961454+00:00", "url": "http://spam.com", "gate": 3, "reason": "Excessive ALL CAPS: 0.82", "metadata": {}}
+{"timestamp": "2026-06-02T17:20:13.963478+00:00", "url": "http://spam.com", "gate": 3, "reason": "Spam pattern: you won't believe", "metadata": {}}

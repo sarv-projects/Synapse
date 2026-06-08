@@ -1,6 +1,8 @@
 """Circuit breaker pattern for source fetchers."""
+import asyncio
 from enum import Enum
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, Optional
 
 
@@ -58,12 +60,14 @@ class CircuitBreaker:
 
 
 class CircuitBreakerRegistry:
-    """Registry of circuit breakers per source backed by JSON file persistence."""
-    
+    """Registry of circuit breakers per source backed by JSON file persistence.
+
+    Uses atomic temp-file + fcntl.flock so concurrent processes writing to
+    the same state_path cannot corrupt the JSON. NOT a process-wide singleton
+    — the owning module in circuit_breaker_wrapper.py holds the shared ref.
+    """
+
     def __init__(self, state_path: str | None = None):
-        import os
-        from pathlib import Path
-        
         self.breakers: Dict[str, CircuitBreaker] = {}
         if state_path is None:
             state_path = str(Path(__file__).parent / "circuit_breaker_state.json")
@@ -73,12 +77,20 @@ class CircuitBreakerRegistry:
     def _load_state(self):
         import os
         import json
+        import fcntl
         import logging
         logger = logging.getLogger(__name__)
         if not os.path.exists(self.state_path):
             return
+        lock_path = f"{self.state_path}.lock"
+        lock_file = None
         f = None
         try:
+            # Acquire a shared (read) lock so we never read a partially
+            # replaced state file that a concurrent _save_state writes.
+            lock_file = open(lock_path, "a+")
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
+
             f = open(self.state_path, "r")
             data = json.load(f)
             for name, item in data.items():
@@ -98,45 +110,80 @@ class CircuitBreakerRegistry:
         finally:
             if f:
                 f.close()
+            if lock_file is not None:
+                try:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                try:
+                    lock_file.close()
+                except Exception:
+                    pass
 
     def _save_state(self):
+        """Persist all breaker states atomically.
+
+        1. Lock file opened *before* entering try so we never half-hold a
+           lock without knowing it.
+        2. Temp file is written, fsynced, then atomically renamed via
+           ``os.replace``.
+        3. On any failure the lock is always released and any leftover
+           ``*.tmp`` file is swept up so later runs start clean.
+        """
         import json
         import os
         import fcntl
         import logging
         logger = logging.getLogger(__name__)
+
+        lock_path = f"{self.state_path}.lock"
+        temp_path = f"{self.state_path}.tmp"
         lock_file = None
-        temp_f = None
         try:
-            data = {}
-            for name, breaker in self.breakers.items():
-                data[name] = {
+            lock_file = open(lock_path, "a+")
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+
+            data = {
+                name: {
                     "state": breaker.state.value,
                     "failure_count": breaker.failure_count,
-                    "last_failure_time": breaker.last_failure_time.isoformat() if breaker.last_failure_time else None,
+                    "last_failure_time": (
+                        breaker.last_failure_time.isoformat()
+                        if breaker.last_failure_time else None
+                    ),
                     "failure_threshold": breaker.failure_threshold,
-                    "timeout_seconds": int(breaker.timeout.total_seconds())
+                    "timeout_seconds": int(breaker.timeout.total_seconds()),
                 }
+                for name, breaker in self.breakers.items()
+            }
 
-            temp_path = f"{self.state_path}.tmp"
-            lock_path = f"{self.state_path}.lock"
-            lock_file = open(lock_path, "a+")
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-            try:
-                temp_f = open(temp_path, "w")
+            with open(temp_path, "w") as temp_f:
                 json.dump(data, temp_f, indent=2)
-                temp_f.close()
-                temp_f = None
-                os.replace(temp_path, self.state_path)
-            finally:
-                fcntl.flock(lock_file, fcntl.LOCK_UN)
+                temp_f.flush()
+                os.fsync(temp_f.fileno())
+
+            os.replace(temp_path, self.state_path)
         except Exception as e:
-            logger.error(f"Failed to save circuit breaker state to {self.state_path}: {e}", exc_info=True)
+            logger.error(
+                f"Failed to save circuit breaker state to {self.state_path}: {e}",
+                exc_info=True,
+            )
         finally:
-            if lock_file:
-                lock_file.close()
-            if temp_f:
-                temp_f.close()
+            try:
+                if lock_file is not None:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                if lock_file is not None:
+                    lock_file.close()
+            except Exception:
+                pass
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
     
     def get_breaker(self, source_name: str) -> CircuitBreaker:
         """Get or create circuit breaker for source."""

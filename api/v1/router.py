@@ -1,6 +1,6 @@
 """API v1 router with versioned endpoints - Open Access."""
 from fastapi import APIRouter, Query, HTTPException, Path
-from typing import Optional
+from typing import Optional, Any
 from api.v1 import groq_status
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -692,7 +692,7 @@ async def org_releases(name: str = Path(...), since: Optional[str] = Query(defau
     try:
         async with client.session() as session:
             filter_clause = ""
-            params = {"name": name}
+            params: dict[str, Any] = {"name": name}
             if since:
                 since_ts = int(datetime.fromisoformat(since).timestamp() * 1000)
                 filter_clause = "AND n.created_at >= $since"

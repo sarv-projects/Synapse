@@ -1,5 +1,5 @@
 """Webhook subscription registry."""
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel, Field
 import hmac
 import hashlib

@@ -2,7 +2,6 @@
 import asyncio
 import logging
 import os
-from typing import Any
 
 from reasoning.graph.state import ReasoningState
 from retrieval.session_index import get_session_index
@@ -191,12 +190,12 @@ async def _fetch_with_aiohttp(urls: list[str]) -> list[dict]:
 
 async def web_research_subagent(state: ReasoningState) -> ReasoningState:
     """Node 4: DuckDuckGo + Tavily + Crawl4AI + ZenRows fallback."""
-    state.current_node = "web_research"
-    state.web_research_used = True
+    state["current_node"] = "web_research"
+    state["web_research_used"] = True
 
-    queries = state.search_queries
+    queries = state.get("search_queries")
     if not queries:
-        queries = [{"query": state.query, "priority": 1}]
+        queries = [{"query": state.get("query", ""), "priority": 1}]
 
     logger.info(f"Web research: {len(queries)} queries, Crawl4AI={CRAWL4AI_AVAILABLE}, Tavily={TAVILY_AVAILABLE}")
 
@@ -221,10 +220,35 @@ async def web_research_subagent(state: ReasoningState) -> ReasoningState:
     fetched = await _fetch_with_crawl4ai(urls_to_fetch)
 
     # Store in session index
-    if state.session_id and fetched:
-        sess_idx = get_session_index(state.session_id)
+    session_id = state.get("session_id")
+    if session_id and fetched:
+        sess_idx = get_session_index(session_id)
         sess_idx.add_documents(fetched)
         logger.info(f"Web research: fetched {len(fetched)} pages, stored in session index")
 
-    state.web_results = fetched
-    return state
+    return {
+        "web_results": fetched,
+        "web_research_used": True
+    }
+
+
+class WebResearchAgent:
+    """Web research agent that orchestrates search and content fetching.
+
+    Wraps the :func:`web_research_subagent` function for use as a
+    drop-in LangGraph node or standalone research tool.
+    """
+
+    def __init__(self) -> None:
+        self._last_results: list[dict] | None = None
+
+    async def run(self, state: ReasoningState) -> ReasoningState:
+        """Execute web research and update *state* with results."""
+        result = await web_research_subagent(state)
+        self._last_results = result.get("web_results")
+        return result
+
+    @property
+    def last_results(self) -> list[dict] | None:
+        """Results from the most recent :meth:`run` call."""
+        return self._last_results

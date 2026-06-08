@@ -1,9 +1,7 @@
 """Background content acquisition — 9 curated sources, 2-hourly scrape, 5-gate verifier."""
 import asyncio
-import hashlib
 import json
 import logging
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -88,9 +86,9 @@ async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
         store = get_qdrant_client()
         results = await store.search_similar_async(vector, limit=1, score_threshold=0.92)
         if results:
-            _log_reject(f"Semantic duplicate (cosine ≥ 0.92)", url, 5, {"match_url": results[0].get("payload", {}).get("name", "")})
+            _log_reject("Semantic duplicate (cosine ≥ 0.92)", url, 5, {"match_url": results[0].get("payload", {}).get("name", "")})
             return False
-    except Exception as e:
+    except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
         logger.debug(f"Gate 5 pgvector dedup skipped: {e}")
     return True
 
@@ -106,7 +104,7 @@ async def _store_in_neo4q(title: str, content: str, url: str, source_type: str):
                 SET bc.title = $title, bc.content_md = $content, bc.source_type = $type,
                     bc.scraped_at = datetime(), bc.status = 'active', bc.verified = true
             """, url=url, title=title, content=content[:10000], type=source_type)
-    except Exception as e:
+    except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
         logger.debug(f"Neo4j storage skipped: {e}")
 
 
@@ -115,12 +113,11 @@ async def _store_in_neo4q(title: str, content: str, url: str, source_type: str):
 async def _fetch_hn(session) -> list[dict]:
     """Hacker News AI posts via Algolia API."""
     try:
-        import aiohttp
         async with session.get("https://hn.algolia.com/api/v1/search?query=AI+machine+learning&tags=story&hitsPerPage=5") as resp:
             if resp.status == 200:
                 data = await resp.json()
                 return [{"title": h.get("title", ""), "content": h.get("story_text", "") or f"Points: {h.get('points', 0)} URL: {h.get('url', '')}", "url": h.get("url", f"https://news.ycombinator.com/item?id={h.get('objectID')}"), "source_type": "hackernews", "metrics": {"score": h.get("points", 0)}} for h in data.get("hits", [])]
-    except Exception as e:
+    except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
         logger.debug(f"HN fetch failed: {e}")
     return []
 
@@ -130,14 +127,13 @@ async def _fetch_reddit(session) -> list[dict]:
     results = []
     for sub in ["MachineLearning", "LocalLLaMA"]:
         try:
-            import aiohttp
             async with session.get(f"https://www.reddit.com/r/{sub}/hot.json?limit=3", headers={"User-Agent": "SYNAPSE/4.0"}) as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     for post in data.get("data", {}).get("children", []):
                         d = post["data"]
                         results.append({"title": d.get("title", ""), "content": d.get("selftext", "")[:5000], "url": f"https://reddit.com{d.get('permalink', '')}", "source_type": "reddit", "metrics": {"score": d.get("score", 0)}})
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Reddit r/{sub} failed: {e}")
     return results
 
@@ -153,7 +149,7 @@ async def _fetch_medium(session) -> list[dict]:
             feed = await asyncio.to_thread(feedparser.parse, feed_url)
             for entry in feed.entries[:3]:
                 results.append({"title": entry.get("title", ""), "content": entry.get("summary", "")[:5000], "url": entry.get("link", ""), "source_type": "medium", "metrics": {"score": 10}})
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Medium feed {feed_url} failed: {e}")
     return results
 
@@ -161,12 +157,11 @@ async def _fetch_medium(session) -> list[dict]:
 async def _fetch_github_trending(session) -> list[dict]:
     """GitHub trending ML repos."""
     try:
-        import aiohttp
         async with session.get("https://api.github.com/search/repositories?q=machine+learning+language:python&sort=stars&per_page=5", headers={"Accept": "application/vnd.github.v3+json"}) as resp:
             if resp.status == 200:
                 data = await resp.json()
                 return [{"title": r.get("full_name", ""), "content": r.get("description", "") or "", "url": r.get("html_url", ""), "source_type": "github", "metrics": {"stars": r.get("stargazers_count", 0)}} for r in data.get("items", [])]
-    except Exception as e:
+    except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
         logger.debug(f"GitHub trending failed: {e}")
     return []
 
@@ -176,13 +171,12 @@ async def _fetch_devto(session) -> list[dict]:
     results = []
     for tag in ["ai", "machinelearning"]:
         try:
-            import aiohttp
             async with session.get(f"https://dev.to/api/articles?tag={tag}&top=3") as resp:
                 if resp.status == 200:
                     data = await resp.json()
                     for item in data[:3]:
                         results.append({"title": item.get("title", ""), "content": item.get("body_markdown", item.get("description", ""))[:5000], "url": item.get("url", ""), "source_type": "devto", "metrics": {"score": item.get("positive_reactions_count", 0)}})
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Dev.to {tag} failed: {e}")
     return results
 
@@ -193,7 +187,7 @@ async def _fetch_youtube(session) -> list[dict]:
         from youtube_search import YoutubeSearch
         results = await asyncio.to_thread(lambda: YoutubeSearch("machine learning paper explained", max_results=3).to_dict())
         return [{"title": r.get("title", ""), "content": r.get("description", "") or f"Views: {r.get('views', '')}", "url": f"https://youtube.com{r.get('url_suffix', '')}", "source_type": "youtube", "metrics": {"views": int(r.get("views", "0").replace(",", ""))}} for r in (results if isinstance(results, list) else [])]
-    except Exception as e:
+    except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
         logger.debug(f"YouTube search failed: {e}")
     return []
 
@@ -220,7 +214,7 @@ async def _fetch_substack(session) -> list[dict]:
                     "source_type": "substack",
                     "metrics": {"score": 10},
                 })
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Substack feed {feed_url} failed: {e}")
     return results
 
@@ -240,7 +234,7 @@ async def _fetch_blogs(session) -> list[dict]:
             feed = await asyncio.to_thread(feedparser.parse, feed_url)
             for entry in feed.entries[:2]:
                 results.append({"title": entry.get("title", ""), "content": entry.get("summary", "")[:5000], "url": entry.get("link", ""), "source_type": "research_blog", "metrics": {}})
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.debug(f"Blog feed {feed_url} failed: {e}")
     return results
 
@@ -265,7 +259,7 @@ async def run_background_scrape(dry_run: bool = False) -> dict:
         results = await asyncio.gather(*fetchers, return_exceptions=True)
 
         for source_results in results:
-            if isinstance(source_results, Exception):
+            if isinstance(source_results, BaseException):
                 stats["errors"] += 1
                 continue
             for item in source_results:

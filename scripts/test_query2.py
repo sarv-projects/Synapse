@@ -1,4 +1,5 @@
-import httpx, json
+import httpx
+import json
 
 r = httpx.post(
     "http://127.0.0.1:8082/api/v1/query",

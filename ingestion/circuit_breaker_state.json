@@ -8,7 +8,7 @@
   },
   "arxiv": {
     "state": "closed",
-    "failure_count": 2,
+    "failure_count": 0,
     "last_failure_time": "2026-05-29T11:09:29.404356",
     "failure_threshold": 3,
     "timeout_seconds": 1800
@@ -35,9 +35,9 @@
     "timeout_seconds": 1800
   },
   "papers_with_code": {
-    "state": "closed",
-    "failure_count": 1,
-    "last_failure_time": "2026-05-29T08:08:08.532964",
+    "state": "open",
+    "failure_count": 3,
+    "last_failure_time": "2026-05-30T08:47:31.660360",
     "failure_threshold": 3,
     "timeout_seconds": 1800
   },
@@ -56,9 +56,9 @@
     "timeout_seconds": 1800
   },
   "semantic_scholar": {
-    "state": "closed",
-    "failure_count": 1,
-    "last_failure_time": "2026-05-29T11:10:46.833058",
+    "state": "open",
+    "failure_count": 3,
+    "last_failure_time": "2026-05-30T08:47:39.798692",
     "failure_threshold": 3,
     "timeout_seconds": 1800
   },
@@ -70,6 +70,41 @@
     "timeout_seconds": 1800
   },
   "openalex": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "towards_data_science": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "openai_blog": {
+    "state": "open",
+    "failure_count": 3,
+    "last_failure_time": "2026-05-30T08:50:09.990453",
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "huggingface_blog": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "huggingface_trending_datasets": {
+    "state": "closed",
+    "failure_count": 0,
+    "last_failure_time": null,
+    "failure_threshold": 3,
+    "timeout_seconds": 1800
+  },
+  "marktechpost": {
     "state": "closed",
     "failure_count": 0,
     "last_failure_time": null,

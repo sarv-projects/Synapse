@@ -1,6 +1,5 @@
-"""Graph export functionality for SYNAPSE v3.0 - JSON-LD, CSV, GraphML."""
-from typing import Dict, Any, List, Optional, Union
-import asyncio
+"""Graph export functionality for SYNAPSE v4.0 - JSON-LD, CSV, GraphML, GEXF."""
+from typing import Dict, Any, List
 import logging
 import csv
 import io
@@ -8,18 +7,44 @@ import zipfile
 from datetime import datetime, UTC
 import json
 
-from ingestion.neo4j.client import Neo4jClient
 from schema.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+
+def _xml_escape(value: str) -> str:
+    """Escape XML special characters in attribute and text values."""
+    return (
+        value
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
+def _stringify_value(value: Any) -> str:
+    """Convert Python value to GraphML/GEXF-safe string."""
+    if isinstance(value, (list, dict)):
+        return json.dumps(value, default=str)
+    return str(value)
+
+
 class GraphExporter:
-    """Export knowledge graph data in multiple formats."""
-    
+    """Export knowledge graph data in multiple formats.
+
+    Supported formats:
+    * ``json-ld`` — semantic-web / linked-data export
+    * ``csv``     — zipped ``nodes.csv`` + ``edges.csv`` + ``metadata.json``
+    * ``graphml`` — Gephi/Cytoscape compatible XML
+    * ``gexf``    — Gephi native format (binary-equivalent, XML-based)
+    """
+
     def __init__(self):
         self.settings = get_settings()
         self.neo4j_client = None
-        
+
         # Export limits
         self.max_nodes_per_export = 500
         self.max_edges_per_export = 2500
@@ -63,12 +88,15 @@ class GraphExporter:
                 edges = edges[:self.max_edges_per_export]
             
             # Export in requested format
+            export_data: Any = None
             if format_type.lower() == "json-ld":
                 export_data = await self._export_json_ld(nodes, edges, include_embeddings)
             elif format_type.lower() == "csv":
                 export_data = await self._export_csv(nodes, edges, include_embeddings)
             elif format_type.lower() == "graphml":
                 export_data = await self._export_graphml(nodes, edges, include_embeddings)
+            elif format_type.lower() == "gexf":
+                export_data = await self._export_gexf(nodes, edges, include_embeddings)
             else:
                 raise ValueError(f"Unsupported export format: {format_type}")
             
@@ -385,11 +413,123 @@ class GraphExporter:
         
         return graphml
     
+    async def _export_gexf(
+        self,
+        nodes: List[Dict],
+        edges: List[Dict],
+        include_embeddings: bool,
+    ) -> str:
+        """Export the graph as GEXF (Gephi native format).
+
+        GEXF is an XML-based format that's the native interchange format
+        of Gephi. It supports per-node and per-edge attribute declarations
+        plus dynamic graph attributes (which we omit here for simplicity).
+
+        See: https://gexf.net/
+        """
+        # Build attribute definitions — required by GEXF so the parser
+        # knows the type of each attribute. We treat all string properties
+        # as ``string`` type; numeric strings stay string for safety.
+        all_node_keys: set[str] = set()
+        all_edge_keys: set[str] = set()
+        for n in nodes:
+            all_node_keys.update(n["properties"].keys())
+        for e in edges:
+            all_edge_keys.update(e["properties"].keys())
+
+        node_attr_defs: list[str] = []
+        for i, key in enumerate(sorted(all_node_keys)):
+            if key == "embedding" and not include_embeddings:
+                continue
+            # GEXF attribute id must be a non-negative integer (as string)
+            node_attr_defs.append(
+                f'        <attribute id="{i}" title="{_xml_escape(key)}" type="string"/>'
+            )
+        edge_attr_defs: list[str] = []
+        offset = len(node_attr_defs)
+        for j, key in enumerate(sorted(all_edge_keys)):
+            edge_attr_defs.append(
+                f'        <attribute id="{offset + j}" title="{_xml_escape(key)}" type="string"/>'
+            )
+
+        # Build node elements
+        node_elements: list[str] = []
+        for node in nodes:
+            label = node["labels"][0] if node["labels"] else "Node"
+            node_id = _xml_escape(node["id"])
+            node_elements.append(
+                f'      <node id="{node_id}" label="{_xml_escape(label)}">'
+            )
+            # Build a map: property key -> GEXF attribute id
+            attr_id_map: dict[str, str] = {}
+            counter = 0
+            for key in sorted(all_node_keys):
+                if key == "embedding" and not include_embeddings:
+                    continue
+                attr_id_map[key] = str(counter)
+                counter += 1
+            for key, value in node["properties"].items():
+                if key == "embedding" and not include_embeddings:
+                    continue
+                if key in attr_id_map:
+                    escaped = _xml_escape(_stringify_value(value))
+                    node_elements.append(
+                        f'        <attvalue for="{attr_id_map[key]}" value="{escaped}"/>'
+                    )
+            node_elements.append("      </node>")
+
+        # Build edge elements
+        edge_elements: list[str] = []
+        edge_attr_id_map: dict[str, str] = {}
+        counter = offset
+        for key in sorted(all_edge_keys):
+            edge_attr_id_map[key] = str(counter)
+            counter += 1
+        for edge in edges:
+            edge_id = _xml_escape(edge["id"])
+            src = _xml_escape(edge["start_node"])
+            tgt = _xml_escape(edge["end_node"])
+            edge_type = _xml_escape(edge["type"])
+            edge_elements.append(
+                f'      <edge id="{edge_id}" source="{src}" target="{tgt}" label="{edge_type}">'
+            )
+            for key, value in edge["properties"].items():
+                if key in edge_attr_id_map:
+                    escaped = _xml_escape(_stringify_value(value))
+                    edge_elements.append(
+                        f'        <attvalue for="{edge_attr_id_map[key]}" value="{escaped}"/>'
+                    )
+            edge_elements.append("      </edge>")
+
+        gexf = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<gexf xmlns="http://www.gexf.net/1.2draft" version="1.2">\n'
+            "  <meta lastmodifieddate=\"" + datetime.now(UTC).strftime("%Y-%m-%d") + "\">\n"
+            '    <creator>SYNAPSE v4.0</creator>\n'
+            '    <description>Knowledge graph export</description>\n'
+            "  </meta>\n"
+            '  <graph mode="static" defaultedgetype="directed">\n'
+            '    <attributes class="node">\n'
+            + "\n".join(node_attr_defs) + "\n"
+            '    </attributes>\n'
+            '    <attributes class="edge">\n'
+            + "\n".join(edge_attr_defs) + "\n"
+            '    </attributes>\n'
+            "    <nodes>\n"
+            + "\n".join(node_elements) + "\n"
+            "    </nodes>\n"
+            "    <edges>\n"
+            + "\n".join(edge_elements) + "\n"
+            "    </edges>\n"
+            "  </graph>\n"
+            "</gexf>\n"
+        )
+        return gexf
     async def get_export_stats(self) -> Dict[str, Any]:
         """Get statistics about the graph for export planning."""
         await self.initialize()
         
-        stats = {}
+        stats: Dict[str, Any] = {}
         
         async with self.neo4j_client.session() as session:
             # Count nodes by type
@@ -445,12 +585,10 @@ class GraphExporter:
         """Validate an export query for safety and performance."""
         await self.initialize()
         
-        validation = {
-            "valid": True,
-            "warnings": [],
-            "estimated_nodes": 0,
-            "estimated_edges": 0
-        }
+        valid = True
+        warnings: List[str] = []
+        estimated_nodes = 0
+        estimated_edges = 0
         
         # Check for dangerous operations
         dangerous_keywords = ["DELETE", "REMOVE", "DETACH", "DROP", "CREATE", "MERGE", "SET"]
@@ -458,16 +596,16 @@ class GraphExporter:
         
         for keyword in dangerous_keywords:
             if keyword in query_upper:
-                validation["valid"] = False
-                validation["warnings"].append(f"Query contains dangerous keyword: {keyword}")
+                valid = False
+                warnings.append(f"Query contains dangerous keyword: {keyword}")
         
         # Check for RETURN clause
         if "RETURN" not in query_upper:
-            validation["valid"] = False
-            validation["warnings"].append("Query must contain RETURN clause")
+            valid = False
+            warnings.append("Query must contain RETURN clause")
         
         # Estimate result size (simple heuristic)
-        if validation["valid"]:
+        if valid:
             try:
                 # Create a count version of the query
                 count_query = query.replace("RETURN", "RETURN count(*) as count")
@@ -477,18 +615,23 @@ class GraphExporter:
                     record = await result.single()
                     
                     if record:
-                        validation["estimated_nodes"] = record["count"]
+                        estimated_nodes = record["count"]
                         
                         # Warn about large exports
                         if record["count"] > self.max_nodes_per_export:
-                            validation["warnings"].append(
+                            warnings.append(
                                 f"Query may return {record['count']} nodes, which exceeds the limit of {self.max_nodes_per_export}"
                             )
                 
             except Exception as e:
-                validation["warnings"].append(f"Could not estimate query size: {e}")
+                warnings.append(f"Could not estimate query size: {e}")
         
-        return validation
+        return {
+            "valid": valid,
+            "warnings": warnings,
+            "estimated_nodes": estimated_nodes,
+            "estimated_edges": estimated_edges
+        }
 
 # Global exporter instance
 _graph_exporter = None
@@ -499,3 +642,5 @@ def get_graph_exporter() -> GraphExporter:
     if _graph_exporter is None:
         _graph_exporter = GraphExporter()
     return _graph_exporter
+
+

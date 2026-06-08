@@ -1,5 +1,5 @@
 """Quick script to check which API endpoints work and what fields they return."""
-import httpx, json
+import httpx
 
 def check(name, url, params=None):
     try:

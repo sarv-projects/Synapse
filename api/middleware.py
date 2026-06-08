@@ -1,5 +1,4 @@
 """Middleware for SYNAPSE v3.0 - Open access, rate limiting, security headers."""
-import asyncio
 import time
 import logging
 from collections import defaultdict

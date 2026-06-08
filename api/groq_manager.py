@@ -1,8 +1,6 @@
 """Groq API key and model rotation manager for SYNAPSE v3.0."""
 import asyncio
 import logging
-import random
-import time
 from datetime import datetime, UTC, timedelta
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
@@ -340,7 +338,7 @@ class GroqKeyManager:
     def get_key_stats(self) -> Dict[str, Any]:
         """Get statistics for all keys."""
         now = datetime.now(UTC)
-        stats = {
+        stats: Dict[str, Any] = {
             "total_keys": len(self.keys),
             "active_keys": len([k for k in self.keys if k.status == KeyStatus.ACTIVE]),
             "depleted_keys": len([k for k in self.keys if k.status == KeyStatus.DEPLETED]),

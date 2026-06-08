@@ -1,14 +1,13 @@
 """Natural Language to Cypher query translation using Llama 4 Scout."""
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 import asyncio
 import logging
 import re
 from datetime import datetime
 
 from ingestion.neo4j.client import Neo4jClient
-from api.groq_manager import get_groq_manager, with_groq_rotation
+from api.groq_manager import get_groq_manager
 from schema.config import get_settings
-from groq import Groq
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +226,7 @@ RULES:
 3. Always include LIMIT {max_results}
 4. Use property names exactly as shown in schema
 5. For "most popular" use ORDER BY n.stargazers_count DESC or n.likes DESC or n.downloads DESC
-6. Return results in a clear format
+6. ALWAYS RETURN ENTIRE NODES (e.g. RETURN n) instead of individual properties. The frontend needs the full node object to render the UI cards correctly.
 
 TASK: Convert this natural language question to a Cypher query:
 "{natural_query}"

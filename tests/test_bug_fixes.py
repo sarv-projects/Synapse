@@ -1,7 +1,7 @@
 """Tests for critical bug fixes — circuit breaker, retrieval, budget, security."""
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 class TestCypherInjectionPrevention:
@@ -19,7 +19,6 @@ class TestCypherInjectionPrevention:
 
     @pytest.mark.asyncio
     async def test_valid_type_accepted(self):
-        from api.v1.router import search
         # Just verify the whitelist logic doesn't reject valid labels
         ALLOWED = {"Paper", "Model", "Tool", "Author", "Organization", "Technique", "Dataset", "Benchmark", "Space"}
         for label in ALLOWED:
@@ -105,7 +104,6 @@ class TestEmbeddingIdConsistency:
 
     def test_nodes_to_dicts_uses_natural_key(self):
         from ingestion.pipeline.run import _nodes_to_dicts
-        from unittest.mock import MagicMock
 
         node = MagicMock()
         node.label = "Paper"

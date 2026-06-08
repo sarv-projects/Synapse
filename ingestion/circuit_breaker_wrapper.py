@@ -1,16 +1,36 @@
 """Circuit breaker wrapper for source fetchers."""
 import asyncio
 import logging
-from typing import List, Optional, Callable, Any
-from functools import wraps
+from typing import List, Any
 
 from ingestion.circuit_breaker import CircuitBreakerRegistry, CircuitState
 from ingestion.sources.base import SourceDocument, SourceFetcher
 
 logger = logging.getLogger(__name__)
 
-# Global circuit breaker registry
-_circuit_registry = CircuitBreakerRegistry()
+# Module-level registry instance — lazily initialised so each OS process
+# (e.g. Gunicorn worker) opens its own file descriptors and the
+# fcntl.flock-based persistence protocol serialises them correctly.
+_circuit_registry: CircuitBreakerRegistry | None = None
+
+
+def _get_registry() -> CircuitBreakerRegistry:
+    """Return the global registry, constructing it on first access."""
+    global _circuit_registry
+    if _circuit_registry is None:
+        _circuit_registry = CircuitBreakerRegistry()
+    return _circuit_registry
+
+
+def reset_registry() -> None:
+    """Replace the global registry with a fresh one.
+
+    Intended for tests that supply an isolated ``state_path`` via
+    ``CircuitBreakerRegistry(state_path=tmp)`` so each test gets its
+    own independent breaker state without cross-test pollution.
+    """
+    global _circuit_registry
+    _circuit_registry = None
 
 
 class CircuitBreakerWrapper:
@@ -19,10 +39,19 @@ class CircuitBreakerWrapper:
     def __init__(self, fetcher, _use_raw_fetch: bool = False):
         self.fetcher = fetcher
         self._use_raw_fetch = _use_raw_fetch
-        source_name = getattr(getattr(fetcher, "manifest", None), "name", None) \
-                      or getattr(getattr(fetcher, "config", None), "name", None) \
-                      or getattr(fetcher, "source_name", "unknown")
-        self.circuit_breaker = _circuit_registry.get_breaker(source_name)
+        source_name = "unknown"
+        try:
+            manifest = getattr(fetcher, "manifest", None)
+            if manifest is not None and hasattr(manifest, "name"):
+                source_name = manifest.name
+            elif hasattr(fetcher, "config"):
+                config = fetcher.config
+                source_name = getattr(config, "name", "unknown") if hasattr(config, "name") else "unknown"
+            else:
+                source_name = getattr(fetcher, "source_name", "unknown")
+        except Exception:
+            source_name = "unknown"
+        self.circuit_breaker = _get_registry().get_breaker(source_name)
         self.source_name = source_name
     
     async def fetch(self) -> List[SourceDocument]:
@@ -127,23 +156,26 @@ def wrap_source_with_circuit_breaker(fetcher: SourceFetcher) -> SourceFetcher:
 
 def get_all_circuit_states() -> dict[str, dict[str, Any]]:
     """Get circuit breaker states for all sources."""
+    registry = _get_registry()
     return {
         name: {
             "state": breaker.state.value,
             "failure_count": breaker.failure_count,
             "can_attempt": breaker.can_attempt()
         }
-        for name, breaker in _circuit_registry.breakers.items()
+        for name, breaker in registry.breakers.items()
     }
 
 
 def reset_circuit_breaker(source_name: str) -> bool:
     """Reset circuit breaker for a specific source (admin function)."""
-    if source_name in _circuit_registry.breakers:
-        breaker = _circuit_registry.breakers[source_name]
+    registry = _get_registry()
+    if source_name in registry.breakers:
+        breaker = registry.breakers[source_name]
         breaker.failure_count = 0
         breaker.state = CircuitState.CLOSED
         breaker.last_failure_time = None
+        registry._save_state()
         logger.info(f"Reset circuit breaker for {source_name}")
         return True
     return False

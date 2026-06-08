@@ -14,7 +14,6 @@ class OpenCVProcessor:
         if self._loaded:
             return
         try:
-            import cv2
             self._loaded = True
             logger.info("OpenCV loaded for document processing")
         except Exception as e:

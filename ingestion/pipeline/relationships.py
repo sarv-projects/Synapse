@@ -15,11 +15,9 @@ Relationships created:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from ingestion.pipeline.state import PipelineState
-from ingestion.sources.base import SourceDocument
-from schema.models import FactTier, GraphEdge, GraphNode, NodeStatus, ProvenanceRecord, VerificationStatus
+from schema.models import FactTier, GraphEdge, GraphNode, ProvenanceRecord, VerificationStatus
 
 logger = logging.getLogger(__name__)
 

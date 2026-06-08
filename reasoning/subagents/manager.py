@@ -1,7 +1,6 @@
 """Subagent Manager — spawns budget-sliced subgraphs."""
 import asyncio
 import logging
-import time
 
 from reasoning.graph.state import ReasoningState
 
@@ -42,7 +41,7 @@ class SubagentManager:
             system=f"You are a focused sub-agent for task: {task_type}",
             context=[],
             tools=[],
-            task=parent_state.query,
+            task=parent_state.get("query"),
         )
         config = InferenceConfig(max_tokens=max_tokens, temperature=0.3)
 

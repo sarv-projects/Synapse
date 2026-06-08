@@ -33,8 +33,8 @@ class LeakyBucketScheduler:
 
     async def acquire(self, model_id: str) -> None:
         sem = self._get_semaphore(model_id)
-        delay = 0
-        max_delay = 30
+        delay: float = 0.0
+        max_delay = 30.0
         while True:
             try:
                 # Semaphore timeout (5s allows for network latency + processing)

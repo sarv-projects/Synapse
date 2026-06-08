@@ -74,7 +74,7 @@ async def lifespan(_app: FastAPI):
     # Shutdown: clean up resource pools
     try:
         from embedding.generator import close_embedding_generator
-        close_embedding_generator()
+        await close_embedding_generator()
 
         from ingestion.neo4j.client import close_neo4j_client
         await close_neo4j_client()

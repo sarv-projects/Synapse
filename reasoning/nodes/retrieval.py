@@ -2,7 +2,7 @@
 import logging
 
 from reasoning.graph.state import ReasoningState
-from retrieval.query_engines import query_hybrid, query_graph, query_vector
+from retrieval.query_engines import query_hybrid, query_graph
 from retrieval.session_index import get_session_index
 
 logger = logging.getLogger(__name__)
@@ -80,4 +80,7 @@ async def retrieval_node(state: ReasoningState) -> ReasoningState:
         f"kg={kg_count}, confidence={state.get('retrieval_confidence', 0.0):.2f}"
     )
 
-    return state
+    return {
+        "retrieval_context": ranked[:30],
+        "retrieval_confidence": state["retrieval_confidence"]
+    }

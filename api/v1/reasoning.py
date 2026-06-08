@@ -1,6 +1,5 @@
 """v4.0 API endpoints: /reason, /reason/{job_id}, /ingest, /budget, /webhook/subscribe."""
 import asyncio
-from dataclasses import asdict, fields, is_dataclass
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -142,28 +141,28 @@ async def _run_reasoning_pipeline(job_id: str, query: str, session_id: str, fmt:
         graph = GraphBuilder().build()
         async for update in graph.astream(state):
             state = _merge_graph_update(state, update)
-            if state.current_node:
-                await _update_job(job_id, current_node=state.current_node)
-            if state.current_node in {"entry", "synthesis", "output"}:
-                await _save_checkpoint(state, state.current_node)
-            if state.status == "FAILED":
-                await _update_job(job_id, status="FAILED", error=state.error)
+            if state.get("current_node"):
+                await _update_job(job_id, current_node=state.get("current_node"))
+            if state.get("current_node") in {"entry", "synthesis", "output"}:
+                await _save_checkpoint(state, state.get("current_node"))
+            if state.get("status") == "FAILED":
+                await _update_job(job_id, status="FAILED", error=state.get("error"))
                 await _persist_job(job_id)
                 return
 
         result = {
-            "markdown": state.final_markdown,
-            "synthesis_markdown": state.synthesis_markdown,
-            "confidence_map": state.confidence_map,
-            "sources": state.sources,
-            "gaps": state.knowledge_gaps,
-            "contradictions": state.contradiction_flags,
-            "model_trace": state.model_trace,
-            "total_tokens": state.total_tokens_used,
-            "retrieval_confidence": state.retrieval_confidence,
-            "web_research_used": state.web_research_used,
+            "markdown": state.get("final_markdown"),
+            "synthesis_markdown": state.get("synthesis_markdown"),
+            "confidence_map": state.get("confidence_map"),
+            "sources": state.get("sources"),
+            "gaps": state.get("knowledge_gaps"),
+            "contradictions": state.get("contradiction_flags"),
+            "model_trace": state.get("model_trace"),
+            "total_tokens": state.get("total_tokens_used"),
+            "retrieval_confidence": state.get("retrieval_confidence"),
+            "web_research_used": state.get("web_research_used"),
         }
-        await _update_job(job_id, status="COMPLETE", result=result, produced_by=state.produced_by)
+        await _update_job(job_id, status="COMPLETE", result=result, produced_by=state.get("produced_by"))
 
         # Attach RAGAS evaluation scores
         try:
@@ -229,15 +228,15 @@ async def _save_checkpoint(state, name: str):
         store = get_checkpoint_store()
         await store.connect()
         state_dict = {
-            "query": state.query, "status": state.status, "session_id": state.session_id,
-            "synthesis_markdown": state.synthesis_markdown,
-            "final_markdown": state.final_markdown,
-            "model_trace": state.model_trace,
-            "total_tokens_used": state.total_tokens_used,
+            "query": state.get("query"), "status": state.get("status"), "session_id": state.get("session_id"),
+            "synthesis_markdown": state.get("synthesis_markdown"),
+            "final_markdown": state.get("final_markdown"),
+            "model_trace": state.get("model_trace"),
+            "total_tokens_used": state.get("total_tokens_used"),
         }
-        await store.save(state.session_id, name, state_dict)
+        await store.save(state.get("session_id"), name, state_dict)
     except Exception as e:
-        logger.error(f"Failed to save checkpoint for session {state.session_id}: {e}", exc_info=True)
+        logger.error(f"Failed to save checkpoint for session {state.get('session_id')}: {e}", exc_info=True)
 
 
 async def _persist_job(job_id: str):

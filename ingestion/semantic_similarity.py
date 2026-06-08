@@ -1,11 +1,8 @@
 """Semantic similarity pass for creating SEMANTICALLY_SIMILAR edges."""
-from typing import List, Dict, Any, Tuple
-import asyncio
+from typing import List, Dict, Any, Tuple, Optional
 import logging
-from datetime import datetime, UTC
 
 from embedding.qdrant_client import get_qdrant_client
-from ingestion.neo4j.client import Neo4jClient
 from schema.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -23,7 +20,7 @@ class SemanticSimilarityPass:
         self.max_similar_per_entity = 5   # Max similar entities to connect
         self.batch_size = 50              # Process entities in batches
     
-    async def run_similarity_pass(self, entity_types: List[str] = None) -> Dict[str, Any]:
+    async def run_similarity_pass(self, entity_types: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Run the semantic similarity pass for specified entity types.
         
@@ -36,12 +33,10 @@ class SemanticSimilarityPass:
         if entity_types is None:
             entity_types = ["Paper", "Technique"]  # Default to v3.0 spec
         
-        results = {
-            "processed_entities": 0,
-            "similar_edges_created": 0,
-            "duplicate_edges_skipped": 0,
-            "errors": []
-        }
+        processed_entities = 0
+        similar_edges_created = 0
+        duplicate_edges_skipped = 0
+        errors: List[str] = []
         
         for entity_type in entity_types:
             logger.info(f"Running semantic similarity pass for {entity_type}")
@@ -59,10 +54,17 @@ class SemanticSimilarityPass:
                 batch_results = await self._process_entity_batch(batch, entity_type)
                 
                 # Aggregate results
-                results["processed_entities"] += batch_results["processed_entities"]
-                results["similar_edges_created"] += batch_results["similar_edges_created"]
-                results["duplicate_edges_skipped"] += batch_results["duplicate_edges_skipped"]
-                results["errors"].extend(batch_results["errors"])
+                processed_entities += batch_results.get("processed_entities", 0)
+                similar_edges_created += batch_results.get("similar_edges_created", 0)
+                duplicate_edges_skipped += batch_results.get("duplicate_edges_skipped", 0)
+                errors.extend(batch_results.get("errors", []))
+        
+        results = {
+            "processed_entities": processed_entities,
+            "similar_edges_created": similar_edges_created,
+            "duplicate_edges_skipped": duplicate_edges_skipped,
+            "errors": errors
+        }
         
         logger.info(f"Semantic similarity pass completed: {results}")
         return results
@@ -95,12 +97,10 @@ class SemanticSimilarityPass:
     
     async def _process_entity_batch(self, entities: List[Dict[str, Any]], entity_type: str) -> Dict[str, Any]:
         """Process a batch of entities to find similar ones."""
-        results = {
-            "processed_entities": 0,
-            "similar_edges_created": 0,
-            "duplicate_edges_skipped": 0,
-            "errors": []
-        }
+        processed_entities = 0
+        similar_edges_created = 0
+        duplicate_edges_skipped = 0
+        errors: List[str] = []
         
         for entity in entities:
             try:
@@ -133,16 +133,21 @@ class SemanticSimilarityPass:
                     edges_to_create, entity_type
                 )
                 
-                results["similar_edges_created"] += edges_created
-                results["duplicate_edges_skipped"] += duplicates_skipped
-                results["processed_entities"] += 1
+                similar_edges_created += edges_created
+                duplicate_edges_skipped += duplicates_skipped
+                processed_entities += 1
                 
             except Exception as e:
                 error_msg = f"Failed to process entity {entity['id']}: {e}"
                 logger.error(error_msg)
-                results["errors"].append(error_msg)
+                errors.append(error_msg)
         
-        return results
+        return {
+            "processed_entities": processed_entities,
+            "similar_edges_created": similar_edges_created,
+            "duplicate_edges_skipped": duplicate_edges_skipped,
+            "errors": errors
+        }
     
     async def _create_similarity_edges(
         self, 

@@ -1,6 +1,6 @@
 """Factory for creating source fetchers from YAML configuration."""
 import yaml
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 
 from ingestion.sources.base import SourceFetcher
@@ -10,7 +10,7 @@ from ingestion.circuit_breaker_wrapper import get_all_circuit_states
 class SourceFactory:
     """Factory for creating and managing source fetchers from configuration."""
     
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: Optional[str] = None):
         if config_path is None:
             # Default to AI domain sources
             config_path = os.path.join(os.path.dirname(__file__), "..", "domains", "ai", "sources.yaml")
@@ -44,7 +44,7 @@ class SourceFactory:
             if source_type in self._registry:
                 fetcher_cls = self._registry[source_type]
                 try:
-                    fetcher = fetcher_cls(source_config)
+                    fetcher = fetcher_cls(source_config)  # type: ignore
                 except TypeError:
                     fetcher = fetcher_cls()
                     if hasattr(fetcher, "configure"):
@@ -55,7 +55,7 @@ class SourceFactory:
         
         return self.active_fetchers[source_name]
     
-    def _get_source_config(self, source_name: str) -> Dict[str, Any]:
+    def _get_source_config(self, source_name: str) -> Optional[Dict[str, Any]]:
         """Get configuration for a specific source."""
         sources = self.sources_config.get("sources", [])
         for source in sources:

@@ -2,7 +2,6 @@
 import logging
 import tiktoken
 from pathlib import Path
-from typing import Optional
 
 from providers.protocol import AssembledPrompt
 

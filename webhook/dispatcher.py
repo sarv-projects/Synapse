@@ -9,7 +9,7 @@ import hmac
 import json
 
 from webhook.registry import WebhookRegistry
-from ingestion.checkpoint.postgres import PostgresCheckpoint
+from ingestion.checkpoint.postgres import FirestoreCheckpoint
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class WebhookDispatcher:
     async def initialize(self):
         """Initialize checkpoint client for delivery tracking."""
         if not self.checkpoint:
-            self.checkpoint = PostgresCheckpoint()
+            self.checkpoint = FirestoreCheckpoint()
             await self.checkpoint.connect()
     
     async def dispatch_pipeline_events(self, pipeline_results: Dict[str, Any]) -> Dict[str, Any]:
@@ -41,31 +41,43 @@ class WebhookDispatcher:
         """
         await self.initialize()
         
-        stats = {
-            "events_dispatched": 0,
-            "deliveries_successful": 0,
-            "deliveries_failed": 0,
-            "subscriptions_inactive": 0,
-            "errors": []
-        }
+        events_dispatched = 0
+        deliveries_successful = 0
+        deliveries_failed = 0
+        subscriptions_inactive = 0
+        errors: List[str] = []
         
         # Extract events from pipeline results
         events = self._extract_events_from_pipeline(pipeline_results)
         
         if not events:
             logger.info("No events to dispatch from pipeline results")
-            return stats
+            return {
+                "events_dispatched": events_dispatched,
+                "deliveries_successful": deliveries_successful,
+                "deliveries_failed": deliveries_failed,
+                "subscriptions_inactive": subscriptions_inactive,
+                "errors": errors
+            }
         
         # Dispatch each event
         for event in events:
             event_stats = await self._dispatch_single_event(event)
             
             # Aggregate statistics
-            stats["events_dispatched"] += 1
-            stats["deliveries_successful"] += event_stats["successful"]
-            stats["deliveries_failed"] += event_stats["failed"]
-            stats["subscriptions_inactive"] += event_stats["inactive"]
-            stats["errors"].extend(event_stats["errors"])
+            events_dispatched += 1
+            deliveries_successful += int(event_stats.get("successful", 0))
+            deliveries_failed += int(event_stats.get("failed", 0))
+            subscriptions_inactive += int(event_stats.get("inactive", 0))
+            errors.extend(event_stats.get("errors", []))
+            
+        stats = {
+            "events_dispatched": events_dispatched,
+            "deliveries_successful": deliveries_successful,
+            "deliveries_failed": deliveries_failed,
+            "subscriptions_inactive": subscriptions_inactive,
+            "errors": errors
+        }
         
         logger.info(f"Webhook dispatch completed: {stats}")
         return stats
@@ -120,16 +132,19 @@ class WebhookDispatcher:
         event_type = event["event"]
         subscriptions = self.registry.get_active_subscriptions(event_type)
         
-        stats = {
-            "successful": 0,
-            "failed": 0,
-            "inactive": 0,
-            "errors": []
-        }
+        successful = 0
+        failed = 0
+        inactive = 0
+        errors: List[str] = []
         
         if not subscriptions:
             logger.debug(f"No active subscriptions for event type: {event_type}")
-            return stats
+            return {
+                "successful": successful,
+                "failed": failed,
+                "inactive": inactive,
+                "errors": errors
+            }
         
         # Dispatch to all subscribers concurrently
         tasks = []
@@ -141,19 +156,24 @@ class WebhookDispatcher:
         
         # Process results
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                stats["failed"] += 1
-                stats["errors"].append(f"Subscription {subscriptions[i].id}: {str(result)}")
+            if isinstance(result, BaseException):
+                failed += 1
+                errors.append(f"Subscription {subscriptions[i].id}: {str(result)}")
             else:
-                if result["success"]:
-                    stats["successful"] += 1
+                if result.get("success"):
+                    successful += 1
                 elif result.get("inactive"):
-                    stats["inactive"] += 1
+                    inactive += 1
                 else:
-                    stats["failed"] += 1
-                    stats["errors"].append(result.get("error", "Unknown error"))
+                    failed += 1
+                    errors.append(result.get("error", "Unknown error"))
         
-        return stats
+        return {
+            "successful": successful,
+            "failed": failed,
+            "inactive": inactive,
+            "errors": errors
+        }
     
     async def _dispatch_to_subscription(self, subscription, event: Dict[str, Any]) -> Dict[str, Any]:
         """Dispatch event to a subscription. Retries happen in background (non-blocking)."""
@@ -172,7 +192,7 @@ class WebhookDispatcher:
         try:
             await self._log_delivery_attempt(delivery_id, subscription.id, event["event"], 0)
             response = await self.client.post(
-                subscription.endpoint_url, data=payload, headers=headers, timeout=30.0
+                subscription.endpoint_url, content=payload, headers=headers, timeout=30.0
             )
             if response.status_code in [200, 201, 202, 204]:
                 await self._log_delivery_success(delivery_id, response.status_code)
@@ -198,7 +218,7 @@ class WebhookDispatcher:
             await asyncio.sleep(delay)
             try:
                 response = await self.client.post(
-                    subscription.endpoint_url, data=payload, headers=headers, timeout=30.0
+                    subscription.endpoint_url, content=payload, headers=headers, timeout=30.0
                 )
                 if response.status_code in [200, 201, 202, 204]:
                     await self._log_delivery_success(delivery_id, response.status_code)

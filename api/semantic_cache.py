@@ -35,6 +35,13 @@ class SemanticCache:
             if not self._url:
                 raise RuntimeError("POSTGRES_URL not configured")
             
+            # Ensure the extension exists before the pool's _init runs
+            init_conn = await asyncpg.connect(self._url)
+            try:
+                await init_conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            finally:
+                await init_conn.close()
+            
             async def _init(conn):
                 await register_vector(conn)
             

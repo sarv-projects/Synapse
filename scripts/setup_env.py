@@ -4,7 +4,6 @@ Interactive environment setup for SYNAPSE v3.0
 Helps configure all required API keys and services.
 """
 
-import os
 import sys
 from pathlib import Path
 

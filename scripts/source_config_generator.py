@@ -178,7 +178,7 @@ class SourceConfigGenerator:
     
     def _get_entity_types(self) -> List[str]:
         """Get entity types from user."""
-        print(f"\n🏷️  Available entity types:")
+        print("\n🏷️  Available entity types:")
         for i, entity in enumerate(self.entity_types, 1):
             print(f"  {i}. {entity}")
         
@@ -329,14 +329,14 @@ Generate the configuration:"""
                 f.write(yaml_str)
             
             print(f"\n💾 Configuration saved to: {filepath}")
-            print(f"\n📋 Next steps:")
-            print(f"1. Review the configuration")
-            print(f"2. Add it to domains/ai/sources.yaml")
-            print(f"3. Test with: python -m ingestion.source_factory")
+            print("\n📋 Next steps:")
+            print("1. Review the configuration")
+            print("2. Add it to domains/ai/sources.yaml")
+            print("3. Test with: python -m ingestion.source_factory")
             
         except Exception as e:
             print(f"❌ Failed to save configuration: {e}")
-            print(f"\n📋 Manual copy:")
+            print("\n📋 Manual copy:")
             print(yaml_str)
 
 

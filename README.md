@@ -8,7 +8,7 @@
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![License MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
-SYNAPSE is a **live, enterprise-grade AI knowledge graph and multi-agent reasoning platform** that continuously maps, queries, and compares the rapidly evolving artificial intelligence ecosystem. By grounding a 7-node LangGraph multi-agent pipeline in a daily-synchronized Neo4j graph and Neon Postgres vector store, SYNAPSE answers deep AI research queries with zero-hallucination citations and strict token cost-controls.
+SYNAPSE is a **self updating AI knowledge graph and multi-agent querying platform** that continuously maps, queries, and compares the rapidly evolving artificial intelligence ecosystem. By grounding a 7-node LangGraph multi-agent pipeline in a daily-synchronized Neo4j graph and Neon Postgres vector store, SYNAPSE answers deep AI research queries with zero-hallucination citations and strict token cost-controls.
 
 No login required. Fully open-access.
 
@@ -333,4 +333,4 @@ synapse/
 ## 📄 License
 MIT License. Details are available in the [LICENSE](LICENSE) file.
 
-Developed with care by **Sarvesh Bhattacharyya**, Bengaluru · May 2026
+Developed by **Sarvesh Bhattacharyya**, Bengaluru · May 2026

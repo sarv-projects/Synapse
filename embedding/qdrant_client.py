@@ -1,6 +1,5 @@
 """pgvector vector store — replaces Qdrant. Uses existing Neon Postgres with halfvec(384)."""
 import logging
-import uuid
 from typing import Any
 
 import asyncpg
@@ -41,6 +40,13 @@ class PGVectorStore:
             if not self._url:
                 raise RuntimeError("POSTGRES_URL not configured")
 
+            # Ensure the extension exists before the pool's _init runs
+            init_conn = await asyncpg.connect(self._url)
+            try:
+                await init_conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+            finally:
+                await init_conn.close()
+
             async def _init(conn):
                 await register_vector(conn)
 
@@ -62,7 +68,6 @@ class PGVectorStore:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # Inside async context — caller should use upsert_vectors_async
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(
                     self._upsert_async(nodes), loop
                 )
@@ -118,7 +123,6 @@ class PGVectorStore:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(
                     self._search_async(query_vector, limit, score_threshold, label_filter),
                     loop,
@@ -204,7 +208,6 @@ class PGVectorStore:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(self._info_async(), loop)
                 return future.result(timeout=10)
             return loop.run_until_complete(self._info_async())
@@ -223,7 +226,6 @@ class PGVectorStore:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(self._delete_async(ids), loop)
                 future.result(timeout=10)
             else:

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
 
 from reasoning.graph.state import ReasoningState
 
@@ -67,7 +68,7 @@ class GraphBuilder:
 
         return wrapped
 
-    def build(self) -> StateGraph:
+    def build(self) -> CompiledStateGraph:
         """Construct and return a compiled LangGraph StateGraph."""
         graph = StateGraph(ReasoningState)
 

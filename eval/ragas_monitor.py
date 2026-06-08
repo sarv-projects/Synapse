@@ -1,5 +1,4 @@
 """RAGAS monitoring — evaluates retrieval quality and answer accuracy per session."""
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -158,7 +157,7 @@ class RagasMonitor:
                 f"recall={score.context_recall:.2f} "
                 f"factual_correctness={score.factual_correctness:.2f}"
             )
-        except Exception as e:
+        except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
             logger.warning(f"RAGAS evaluation failed: {e}")
 
         self.scores.append(score)

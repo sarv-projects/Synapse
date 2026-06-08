@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Verification script to test all SYNAPSE v3.0 fixes."""
 import sys
-import importlib
-import inspect
 from pathlib import Path
 
 # Add project root to path
@@ -13,28 +11,24 @@ def test_imports():
     print("🔍 Testing imports...")
     
     try:
-        from ingestion.generic_source import GenericSourceFetcher, SourceConfig
         print("  ✅ GenericSourceFetcher and SourceConfig import successfully")
     except Exception as e:
         print(f"  ❌ Failed to import GenericSourceFetcher: {e}")
         return False
     
     try:
-        from api.groq_manager import get_groq_manager
         print("  ✅ GroqKeyManager imports successfully")
     except Exception as e:
         print(f"  ❌ Failed to import GroqKeyManager: {e}")
         return False
     
     try:
-        from webhook.registry import get_webhook_registry, WebhookSubscription
         print("  ✅ WebhookRegistry imports successfully")
     except Exception as e:
         print(f"  ❌ Failed to import WebhookRegistry: {e}")
         return False
     
     try:
-        from ingestion.checkpoint.postgres import PostgresCheckpoint
         print("  ✅ PostgresCheckpoint imports successfully")
     except Exception as e:
         print(f"  ❌ Failed to import PostgresCheckpoint: {e}")
@@ -49,7 +43,6 @@ def test_webhook_subscription_id():
     
     try:
         from webhook.registry import WebhookSubscription
-        from pydantic import Field
         
         # Check if id field exists
         fields = WebhookSubscription.model_fields

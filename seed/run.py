@@ -6,7 +6,6 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-from ingestion.generic_source import GenericSourceFetcher, SourceConfig
 from ingestion.sources.base import SourceDocument
 from schema.config import get_settings
 

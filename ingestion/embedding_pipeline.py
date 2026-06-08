@@ -2,24 +2,28 @@
 from typing import List, Dict, Any, Optional
 import asyncio
 import logging
-from datetime import datetime, UTC
 import uuid
 
 from embedding.generator import EmbeddingGenerator, get_embedding_generator
 from embedding.qdrant_client import get_qdrant_client
-from ingestion.neo4j.client import Neo4jClient
 from schema.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 class EmbeddingPipeline:
-    """Pipeline for generating and storing embeddings for nodes."""
-    
-    def __init__(self):
+    """Pipeline for generating and storing embeddings for nodes.
+
+    When ``neo4j_client`` is provided at construction, all Neo4j
+    operations share that client's connection pool. This avoids creating
+    a second driver pool when the pipeline is invoked from the
+    ingestion pipeline runner (which already holds a pooled client).
+    """
+
+    def __init__(self, neo4j_client=None):
         self.embedding_generator: EmbeddingGenerator | None = None
         self.qdrant_client = get_qdrant_client()
         self.settings = get_settings()
-        self.neo4j_client = None  # Will be initialized when needed
+        self.neo4j_client = neo4j_client  # injected, or None → create lazily
 
     async def ensure_initialized(self) -> EmbeddingGenerator:
         if self.embedding_generator is None:
@@ -37,20 +41,24 @@ class EmbeddingPipeline:
             Dict with processing results
         """
         _ = await self.ensure_initialized()
-        results = {
-            "processed": 0,
-            "embeddings_generated": 0,
-            "qdrant_upserted": 0,
-            "neo4j_updated": 0,
-            "errors": []
-        }
+        processed = 0
+        embeddings_generated = 0
+        qdrant_upserted = 0
+        neo4j_updated = 0
+        errors: List[str] = []
         
         # Extract entities that need embeddings
         entities_to_embed = self._extract_entities_for_embedding(documents)
         
         if not entities_to_embed:
             logger.info("No entities found that need embeddings")
-            return results
+            return {
+                "processed": processed,
+                "embeddings_generated": embeddings_generated,
+                "qdrant_upserted": qdrant_upserted,
+                "neo4j_updated": neo4j_updated,
+                "errors": errors
+            }
         
         # Generate embeddings in batches
         batch_size = 64
@@ -59,10 +67,19 @@ class EmbeddingPipeline:
             batch_results = await self._process_batch(batch)
             
             # Aggregate results
-            for key in results:
-                if key != "errors":
-                    results[key] += batch_results[key]
-            results["errors"].extend(batch_results["errors"])
+            processed += batch_results.get("processed", 0)
+            embeddings_generated += batch_results.get("embeddings_generated", 0)
+            qdrant_upserted += batch_results.get("qdrant_upserted", 0)
+            neo4j_updated += batch_results.get("neo4j_updated", 0)
+            errors.extend(batch_results.get("errors", []))
+            
+        results = {
+            "processed": processed,
+            "embeddings_generated": embeddings_generated,
+            "qdrant_upserted": qdrant_upserted,
+            "neo4j_updated": neo4j_updated,
+            "errors": errors
+        }
         
         logger.info(f"Embedding pipeline completed: {results}")
         return results
@@ -113,13 +130,11 @@ class EmbeddingPipeline:
     
     async def _process_batch(self, entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Process a batch of entities for embedding."""
-        results = {
-            "processed": 0,
-            "embeddings_generated": 0,
-            "qdrant_upserted": 0,
-            "neo4j_updated": 0,
-            "errors": []
-        }
+        processed = len(entities)
+        embeddings_generated = 0
+        qdrant_upserted = 0
+        neo4j_updated = 0
+        errors: List[str] = []
         
         # Generate embeddings
         embedding_vectors = []
@@ -131,14 +146,20 @@ class EmbeddingPipeline:
                         "entity": entity,
                         "vector": vector
                     })
-                    results["embeddings_generated"] += 1
+                    embeddings_generated += 1
             except Exception as e:
                 error_msg = f"Failed to generate embedding for {entity.get('type')} {entity.get('id')}: {e}"
                 logger.error(error_msg, exc_info=True)
-                results["errors"].append(error_msg)
+                errors.append(error_msg)
         
         if not embedding_vectors:
-            return results
+            return {
+                "processed": processed,
+                "embeddings_generated": embeddings_generated,
+                "qdrant_upserted": qdrant_upserted,
+                "neo4j_updated": neo4j_updated,
+                "errors": errors
+            }
         
         # Prepare vectors for Qdrant upsert
         qdrant_nodes = []
@@ -154,19 +175,29 @@ class EmbeddingPipeline:
         
         # Upsert to pgvector
         if await self.qdrant_client.upsert_vectors_async(qdrant_nodes):
-            results["qdrant_upserted"] = len(qdrant_nodes)
+            qdrant_upserted = len(qdrant_nodes)
         else:
             error_msg = "Failed to upsert vectors to pgvector"
             logger.error(error_msg)
-            results["errors"].append(error_msg)
-            return results
+            errors.append(error_msg)
+            return {
+                "processed": processed,
+                "embeddings_generated": embeddings_generated,
+                "qdrant_upserted": qdrant_upserted,
+                "neo4j_updated": neo4j_updated,
+                "errors": errors
+            }
         
         # Update Neo4j with embedding references
         neo4j_updated = await self._update_neo4j_embeddings(embedding_vectors)
-        results["neo4j_updated"] = neo4j_updated
         
-        results["processed"] = len(entities)
-        return results
+        return {
+            "processed": processed,
+            "embeddings_generated": embeddings_generated,
+            "qdrant_upserted": qdrant_upserted,
+            "neo4j_updated": neo4j_updated,
+            "errors": errors
+        }
     
     def _generate_embedding_for_entity(self, entity: Dict[str, Any]) -> Optional[List[float]]:
         """Generate embedding for a specific entity."""
@@ -191,8 +222,8 @@ class EmbeddingPipeline:
     async def _update_neo4j_embeddings(self, embedding_vectors: List[Dict[str, Any]]) -> int:
         """Update Neo4j nodes with embedding references."""
         if not self.neo4j_client:
-            from ingestion.neo4j.client import Neo4jClient
-            self.neo4j_client = Neo4jClient.from_settings(self.settings)
+            from ingestion.neo4j.client import get_neo4j_client
+            self.neo4j_client = await get_neo4j_client()
         
         updated_count = 0
         
@@ -274,8 +305,8 @@ class EmbeddingPipeline:
         
         # Get full entity details from Neo4j
         if not self.neo4j_client:
-            from ingestion.neo4j.client import Neo4jClient
-            self.neo4j_client = Neo4jClient.from_settings(self.settings)
+            from ingestion.neo4j.client import get_neo4j_client
+            self.neo4j_client = await get_neo4j_client()
         
         results = []
         async with self.neo4j_client.session() as session:
@@ -313,8 +344,8 @@ class EmbeddingPipeline:
         
         # Get Neo4j embedding index stats
         if not self.neo4j_client:
-            from ingestion.neo4j.client import Neo4jClient
-            self.neo4j_client = Neo4jClient.from_settings(self.settings)
+            from ingestion.neo4j.client import get_neo4j_client
+            self.neo4j_client = await get_neo4j_client()
         
         neo4j_stats = {}
         async with self.neo4j_client.session() as session:
@@ -340,10 +371,16 @@ class EmbeddingPipeline:
 # Global pipeline instance
 _embedding_pipeline = None
 
-async def get_embedding_pipeline() -> EmbeddingPipeline:
-    """Get the global embedding pipeline instance."""
+async def get_embedding_pipeline(neo4j_client=None) -> EmbeddingPipeline:
+    """Get the global embedding pipeline instance.
+
+    When called from the ingestion pipeline runner, pass the caller's
+    Neo4j client so that all Neo4j operations share one connection pool.
+    """
     global _embedding_pipeline
     if _embedding_pipeline is None:
-        _embedding_pipeline = EmbeddingPipeline()
+        _embedding_pipeline = EmbeddingPipeline(neo4j_client=neo4j_client)
         await _embedding_pipeline.ensure_initialized()
+    elif neo4j_client is not None:
+        _embedding_pipeline.neo4j_client = neo4j_client
     return _embedding_pipeline

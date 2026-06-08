@@ -31,7 +31,19 @@ function flattenResult(item: Record<string, any>): Record<string, any> {
   const flat: Record<string, any> = {}
   for (const [k, v] of Object.entries(item)) {
     const cleanKey = k.includes('.') ? k.split('.').slice(1).join('.') : k
-    if (v !== null && v !== undefined && v !== '') flat[cleanKey] = v
+    
+    if (v !== null && v !== undefined && v !== '') {
+      // Unwrap serialized Neo4j nodes (which have 'properties' and 'id')
+      if (typeof v === 'object' && !Array.isArray(v) && 'properties' in v && 'id' in v) {
+        for (const [propK, propV] of Object.entries(v.properties as Record<string, any>)) {
+          flat[propK] = propV
+        }
+        flat._node_id = v.id
+        flat._labels = v.labels
+      } else {
+        flat[cleanKey] = v
+      }
+    }
   }
   return flat
 }

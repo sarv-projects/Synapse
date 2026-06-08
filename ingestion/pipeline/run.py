@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 
 from ingestion.circuit_breaker_wrapper import CircuitBreakerWrapper
 from ingestion.generic_source import GenericSourceFetcher
-from ingestion.neo4j.client import Neo4jClient
+from ingestion.neo4j.client import get_neo4j_client, close_neo4j_client
 from ingestion.neo4j.writer import merge_edges, merge_nodes
 from ingestion.pipeline.extraction import fast_path_transform
 from ingestion.pipeline.relationships import extract_relationships
@@ -70,8 +70,8 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
     checkpoint = None
     try:
         if settings.postgres_url:
-            from ingestion.checkpoint.postgres import PostgresCheckpoint
-            checkpoint = PostgresCheckpoint()
+            from ingestion.checkpoint.postgres import FirestoreCheckpoint
+            checkpoint = FirestoreCheckpoint()
             await checkpoint.connect()
             logger.info("Checkpoint store connected")
     except Exception as e:
@@ -121,8 +121,10 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
         f"{state.metrics.get('extra_nodes_from_relationships', 0)} extra nodes"
     )
 
-    # ── Stage 4: Write nodes to Neo4j ─────────────────────────────────────────
-    neo4j = Neo4jClient.from_settings(settings)
+    # ── Stage 4: Write nodes → Neo4j ─────────────────────────────────────────
+    # Use the module-level singleton so all pipeline stages share one
+    # connection pool (see get_neo4j_client / close_neo4j_client).
+    neo4j = await get_neo4j_client()
     try:
         written = await merge_nodes(neo4j, state.nodes)
         logger.info(f"Stage 3a complete: {written} nodes merged into Neo4j")
@@ -130,14 +132,17 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
         # ── Stage 5: Write edges to Neo4j ─────────────────────────────────────
         edges_written = await merge_edges(neo4j, state.edges)
         logger.info(f"Stage 3b complete: {edges_written} edges merged into Neo4j")
-    finally:
-        await neo4j.close()
+    except Exception:
+        logger.exception("Neo4j write stage failed")
+        # Don't close here — later stages may recover; final cleanup in Stage 9.
 
     # ── Stage 6: Generate embeddings ──────────────────────────────────────────
     embeddings_result = {"embeddings_generated": 0, "errors": []}
     try:
         from ingestion.embedding_pipeline import get_embedding_pipeline
-        emb_pipeline = await get_embedding_pipeline()
+        # Pass the shared Neo4j client so the embedding pipeline reuses
+        # the same connection pool instead of creating a second driver.
+        emb_pipeline = await get_embedding_pipeline(neo4j_client=neo4j)
         node_dicts = _nodes_to_dicts(state.nodes)
         if node_dicts:
             embeddings_result = await emb_pipeline.process_documents(node_dicts)
@@ -150,6 +155,9 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
     try:
         from ingestion.semantic_similarity import get_semantic_similarity_pass
         sim_pass = get_semantic_similarity_pass()
+        # Inject the shared client so the similarity pass doesn't create a
+        # third driver pool that would leak.
+        sim_pass.neo4j_client = neo4j
         similarity_result = await sim_pass.run_similarity_pass()
         logger.info(f"Stage 5: {similarity_result.get('similar_edges_created', 0)} similarity edges created")
     except Exception as e:
@@ -172,6 +180,10 @@ async def run_pipeline(domain: str = "ai", sources: list[str] | None = None) -> 
         await dispatcher.close()
     except Exception as e:
         logger.warning(f"Webhook dispatch skipped: {e}")
+
+    # ── Stage 9: Close shared resources ─────────────────────────────────────────
+    # Shut down the singleton Neo4j client now that all stages are done.
+    await close_neo4j_client()
 
     duration = round(time.perf_counter() - t0, 2)
 
@@ -220,7 +232,7 @@ def main() -> None:
         if k != "warnings":
             print(f"  {k:<20} {v}")
     if summary.get("warnings"):
-        print(f"  warnings:")
+        print("  warnings:")
         for w in summary["warnings"]:
             print(f"    - {w}")
     print("="*50)

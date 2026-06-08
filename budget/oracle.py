@@ -1,14 +1,13 @@
 """Budget Oracle — async singleton consulted before every LLM call in v4.0."""
-import asyncio
 import logging
 import yaml
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from budget.register import BudgetRegister, ModelBudget
+from budget.register import BudgetRegister
 from budget.scheduler import LeakyBucketScheduler
-from budget.prompt_caching import supports_prompt_caching, get_effective_tpm_cost
+from budget.prompt_caching import supports_prompt_caching
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class BudgetOracle:
                     budget.rpd_remaining = mdata.get("rpd_remaining", budget.rpd_remaining)
                     budget.tpm_remaining = mdata.get("tpm_remaining", budget.tpm_remaining)
                 logger.info(f"Budget Oracle restored {len(data)} models from DynamoDB")
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to restore budget state from DynamoDB")
             logger.warning("Falling back to default in-memory budgets.")
         self._restored = True

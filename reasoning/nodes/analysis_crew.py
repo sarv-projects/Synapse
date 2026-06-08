@@ -3,7 +3,7 @@ import json
 import logging
 
 from reasoning.graph.state import ReasoningState
-from providers.protocol import InferenceConfig, AssembledPrompt
+from providers.protocol import InferenceConfig
 from providers.groq_provider import GroqProvider
 from prompt.assembler import PromptAssembler
 

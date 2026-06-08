@@ -1,6 +1,6 @@
 """Per-model RPM/RPD/TPM register for the Budget Controller."""
 from dataclasses import dataclass, field
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, UTC
 from typing import Optional
 import logging
 
