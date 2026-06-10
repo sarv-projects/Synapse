@@ -22,7 +22,7 @@ async def _get_client():
 @router.get("/health")
 async def health():
     """Health check endpoint — includes live Neo4j node/edge counts."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
     result = {
@@ -35,9 +35,9 @@ async def health():
         "nodes_with_embeddings": 0,
     }
 
+    client = None
     try:
-        settings = get_settings()
-        client = Neo4jClient.from_settings(settings)
+        client = await get_neo4j_client()
         async with client.session() as session:
             r = await session.run(
                 "MATCH (n) RETURN count(n) AS nodes, "
@@ -57,7 +57,6 @@ async def health():
             row3 = await r3.single()
             if row3:
                 result["nodes_with_embeddings"] = row3["c"]
-        await client.close()
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
         # rewritten as a 200 by the catch-all below.
@@ -66,6 +65,13 @@ async def health():
         logger.error(f"Health check failed: {e}", exc_info=True)
         result["status"] = "degraded"
         result["db_error"] = str(e)
+    finally:
+        # Ensure client is properly closed even if exception occurs
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in health check: {close_err}")
 
     return result
 
@@ -73,13 +79,12 @@ async def health():
 @router.get("/whats-new")
 async def whats_new(days: int = Query(default=1, ge=1, le=30)):
     """Get new entities from last N days."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         cutoff = days * 86400000
         async with client.session() as session:
             r = await session.run("""
@@ -104,7 +109,6 @@ async def whats_new(days: int = Query(default=1, ge=1, le=30)):
                     "name": node.get("full_name") or node.get("name") or node.get("title") or node.get("canonical_name") or "",
                 })
 
-        await client.close()
         return {"days": days, "entities": entities, "recent": recent}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -112,8 +116,13 @@ async def whats_new(days: int = Query(default=1, ge=1, le=30)):
         raise
     except Exception as e:
         logger.error(f"Whats-new query failed: {e}", exc_info=True)
-        await client.close()
         return {"days": days, "entities": [], "recent": [], "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in whats-new: {close_err}")
 
 
 @router.get("/search")
@@ -124,14 +133,13 @@ async def search(
     limit: int = Query(default=50, ge=1, le=100),
 ):
     """Full-text search across Neo4j nodes."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     ALLOWED_LABELS = {"Paper", "Model", "Tool", "Author", "Organization", "Technique", "Dataset", "Benchmark", "Space"}
     try:
+        client = await get_neo4j_client()
         if type and type != "all" and type not in ALLOWED_LABELS:
             raise HTTPException(status_code=400, detail=f"Invalid type filter. Allowed: {', '.join(sorted(ALLOWED_LABELS))}")
         label_filter = f":{type}" if type and type != "all" else ""
@@ -183,7 +191,6 @@ async def search(
                     "evidence_url": props.get("html_url") or props.get("link") or "",
                 })
 
-        await client.close()
         return {"results": results, "next_cursor": None, "total_hint": len(results)}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -191,22 +198,27 @@ async def search(
         raise
     except Exception as e:
         logger.error(f"Search query failed: {e}", exc_info=True)
-        await client.close()
         return {"results": [], "next_cursor": None, "total_hint": 0, "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in search: {close_err}")
 
 
 @router.get("/similar")
 async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
     """Top-k semantically similar nodes via pgvector."""
     from embedding.qdrant_client import get_qdrant_client
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
+    client = None
     store = get_qdrant_client()
 
     try:
+        client = await get_neo4j_client()
         async with client.session() as session:
             r = await session.run("""
                 MATCH (n) WHERE n.full_name = $id OR n.name = $id OR n.id = $id
@@ -214,14 +226,12 @@ async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
             """, id=id)
             row = await r.single()
             if not row:
-                await client.close()
                 return {"similar": [], "error": "Entity not found"}
 
             node = dict(row["n"])
             label = row["label"]
             embedding = node.get("embedding")
             if not embedding:
-                await client.close()
                 return {"similar": [], "error": "Entity has no embedding"}
 
             similar_items = await store.search_similar_async(
@@ -250,7 +260,6 @@ async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
                         "similarity_score": item["score"],
                     })
 
-        await client.close()
         return {"similar": results, "query_id": id}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -258,8 +267,13 @@ async def similar(id: str = Query(...), k: int = Query(default=5, ge=1, le=20)):
         raise
     except Exception as e:
         logger.error(f"Similar query failed: {e}", exc_info=True)
-        await client.close()
         return {"similar": [], "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in similar: {close_err}")
 
 
 @router.get("/export")
@@ -269,15 +283,27 @@ async def export(
     include_embeddings: bool = Query(default=False),
 ):
     """Export subgraph as JSON-LD, CSV, or GraphML."""
-    from export.graph_exporter import get_graph_exporter
+    from ingestion.neo4j.client import get_neo4j_client
+    from schema.config import get_settings
 
-    exporter = get_graph_exporter()
-    result = await exporter.export_subgraph(
-        query=query,
-        format_type=format,
-        include_embeddings=include_embeddings,
-    )
-    return result
+    client = None
+    try:
+        client = await get_neo4j_client()
+        from export.graph_exporter import get_graph_exporter
+
+        exporter = get_graph_exporter()
+        result = await exporter.export_subgraph(
+            query=query,
+            format_type=format,
+            include_embeddings=include_embeddings,
+        )
+        return result
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in export: {close_err}")
 
 
 @router.get("/diff")
@@ -286,13 +312,12 @@ async def diff(
     to_date: Optional[str] = Query(default=None, alias="to"),
 ):
     """Temporal diff between two dates."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         async with client.session() as session:
             if from_date and to_date:
                 from_ts = int(datetime.fromisoformat(from_date).timestamp() * 1000)
@@ -343,7 +368,6 @@ async def diff(
                     })
                 removed = []
 
-        await client.close()
         return {"added": added, "removed": removed, "from": from_date, "to": to_date}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -351,8 +375,13 @@ async def diff(
         raise
     except Exception as e:
         logger.error(f"Diff query failed: {e}", exc_info=True)
-        await client.close()
         return {"added": [], "removed": [], "from": from_date, "to": to_date, "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in diff: {close_err}")
 
 
 async def _get_lmsys_arena_leaderboard(category: str = "overall") -> list[dict]:
@@ -484,13 +513,12 @@ async def leaderboard(
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """Top tools, papers, or techniques leaderboard."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         items = []
         if type == "models":
             # Direct LMSYS Chatbot Arena leaderboard merge
@@ -530,7 +558,6 @@ async def leaderboard(
                 async for record in r:
                     items.append(dict(record))
 
-        await client.close()
         return {"type": type, "items": items[:limit], "count": len(items[:limit])}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -538,20 +565,24 @@ async def leaderboard(
         raise
     except Exception as e:
         logger.error(f"Leaderboard query failed: {e}", exc_info=True)
-        await client.close()
         return {"type": type, "items": [], "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in leaderboard: {close_err}")
 
 
 @router.get("/changelog")
 async def changelog():
     """Schema and pipeline changelog."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         async with client.session() as session:
             r = await session.run("""
                 MATCH (n:ChangelogEntry)
@@ -567,7 +598,6 @@ async def changelog():
                     "breaking_change": node.get("breaking_change", False),
                 })
 
-        await client.close()
         return {"entries": entries}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -575,8 +605,13 @@ async def changelog():
         raise
     except Exception as e:
         logger.error(f"Changelog query failed: {e}", exc_info=True)
-        await client.close()
         return {"entries": [], "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in changelog: {close_err}")
 
 
 # ── Graph Traversal Endpoints ──────────────────────────────────────────────────
@@ -585,13 +620,12 @@ async def changelog():
 @router.get("/technique/{name}/ecosystem")
 async def technique_ecosystem(name: str = Path(...)):
     """2-hop ecosystem graph for a technique — papers, tools, models."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         async with client.session() as session:
             r = await session.run("""
                 MATCH (t:Technique {canonical_name: $name})
@@ -606,7 +640,6 @@ async def technique_ecosystem(name: str = Path(...)):
             """, name=name)
             row = await r.single()
             if not row:
-                await client.close()
                 return {"name": name, "nodes": [], "edges": []}
 
             technique = {
@@ -668,7 +701,6 @@ async def technique_ecosystem(name: str = Path(...)):
                     "type": "IMPLEMENTS",
                 })
 
-        await client.close()
         return {"name": name, "nodes": nodes, "edges": edges}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -676,20 +708,24 @@ async def technique_ecosystem(name: str = Path(...)):
         raise
     except Exception as e:
         logger.error(f"Technique ecosystem query failed: {e}", exc_info=True)
-        await client.close()
         return {"name": name, "nodes": [], "edges": [], "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in technique_ecosystem: {close_err}")
 
 
 @router.get("/org/{name}/releases")
 async def org_releases(name: str = Path(...), since: Optional[str] = Query(default=None)):
     """All papers, models, tools from an org."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         async with client.session() as session:
             filter_clause = ""
             params: dict[str, Any] = {"name": name}
@@ -717,7 +753,6 @@ async def org_releases(name: str = Path(...), since: Optional[str] = Query(defau
                     "created_at": node.get("created_at"),
                 })
 
-        await client.close()
         return {"org": name, "items": items, "count": len(items)}
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -725,20 +760,24 @@ async def org_releases(name: str = Path(...), since: Optional[str] = Query(defau
         raise
     except Exception as e:
         logger.error(f"Org releases query failed: {e}", exc_info=True)
-        await client.close()
         return {"org": name, "items": [], "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in org_releases: {close_err}")
 
 
 @router.get("/model/{hf_id}/lineage")
 async def model_lineage(hf_id: str = Path(...)):
     """Base model, fine-tunes, tools, benchmarks."""
-    from ingestion.neo4j.client import Neo4jClient
+    from ingestion.neo4j.client import get_neo4j_client
     from schema.config import get_settings
 
-    settings = get_settings()
-    client = Neo4jClient.from_settings(settings)
-
+    client = None
     try:
+        client = await get_neo4j_client()
         async with client.session() as session:
             r = await session.run("""
                 MATCH (m:Model {hf_model_id: $hf_id})
@@ -756,10 +795,8 @@ async def model_lineage(hf_id: str = Path(...)):
             """, hf_id=hf_id)
             row = await r.single()
             if not row:
-                await client.close()
                 return {"id": hf_id, "error": "Model not found"}
 
-        await client.close()
         return dict(row)
     except HTTPException:
         # Preserve FastAPI's intended 4xx response — don't let it get
@@ -767,8 +804,13 @@ async def model_lineage(hf_id: str = Path(...)):
         raise
     except Exception as e:
         logger.error(f"Model lineage query failed: {e}", exc_info=True)
-        await client.close()
         return {"id": hf_id, "error": str(e)}
+    finally:
+        if client:
+            try:
+                await client.close()
+            except Exception as close_err:
+                logger.warning(f"Failed to close Neo4j client in model_lineage: {close_err}")
 
 
 # ── Query endpoints ──────────────────────────────────────────────────────────

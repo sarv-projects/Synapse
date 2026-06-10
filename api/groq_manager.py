@@ -434,6 +434,28 @@ async def hourly_reset_task():
     manager = get_groq_manager()
     await manager.reset_hourly_limits()
 
+# Global flag to ensure we only schedule the task once
+_reset_task_scheduled = False
+
+def schedule_hourly_reset(app):
+    """Schedule the hourly reset task on app startup."""
+    global _reset_task_scheduled
+    if not _reset_task_scheduled:
+        import asyncio
+        
+        async def cycle_reset():
+            """Periodically call hourly_reset_task every hour."""
+            while True:
+                try:
+                    await asyncio.sleep(3600)  # Wait 1 hour
+                    await hourly_reset_task()
+                except Exception as e:
+                    logger.error(f"Error in hourly reset cycle: {e}", exc_info=True)
+        
+        asyncio.create_task(cycle_reset())
+        _reset_task_scheduled = True
+        logger.info("Scheduled Groq hourly TPM reset task")
+
 # Decorator for automatic key rotation
 def with_groq_rotation(func):
     """Decorator to automatically handle Groq key rotation."""

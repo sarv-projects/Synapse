@@ -14,9 +14,8 @@ class WebResearchCache:
     async def store(self, query_text: str, query_embedding: list[float], result_urls: list[str], content_md: str, session_id: str):
         """Store web research results as WebResearchResult nodes."""
         try:
-            from ingestion.neo4j.client import Neo4jClient
-            from schema.config import get_settings
-            client = Neo4jClient.from_settings(get_settings())
+            from ingestion.neo4j.client import get_neo4j_client
+            client = await get_neo4j_client()
             try:
                 async with client.session() as s:
                     await s.run("""
@@ -55,9 +54,8 @@ class WebResearchCache:
     async def cleanup_expired(self):
         """Archive cached results older than 7 days."""
         try:
-            from ingestion.neo4j.client import Neo4jClient
-            from schema.config import get_settings
-            client = Neo4jClient.from_settings(get_settings())
+            from ingestion.neo4j.client import get_neo4j_client
+            client = await get_neo4j_client()
             try:
                 cutoff = datetime.now(UTC) - timedelta(days=7)
                 async with client.session() as s:

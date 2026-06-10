@@ -49,7 +49,7 @@ class Settings(BaseModel):
     # API & Security
     synapse_admin_key: str = Field(default="")
     api_version: str = Field(default="v1")
-    cors_origins: list[str] = Field(default=...)
+    cors_origins: list[str] = Field(default=["http://localhost:3000", "http://localhost:8000"])
     x_content_type_options: str = Field(default="nosniff")
     x_frame_options: str = Field(default="SAMEORIGIN")
     x_xss_protection: str = Field(default="1; mode=block")
@@ -73,9 +73,8 @@ class Settings(BaseModel):
 
     @classmethod
     def from_env(cls) -> "Settings":
-        cors_raw = os.getenv("CORS_ORIGINS")
-        if not cors_raw:
-            raise ValueError("CORS_ORIGINS environment variable is required")
+        # CORS_ORIGINS with sensible default
+        cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
         cors_origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
 
         neo4j_uri = os.getenv("NEO4J_URI")

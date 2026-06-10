@@ -31,19 +31,27 @@ class LeakyBucketScheduler:
             self._semaphores[model_id] = asyncio.Semaphore(limit)
         return self._semaphores[model_id]
 
-    async def acquire(self, model_id: str) -> None:
+    async def acquire(self, model_id: str, max_retries: int = 10) -> None:
+        """Acquire semaphore with maximum retry limit to prevent infinite loops."""
         sem = self._get_semaphore(model_id)
         delay: float = 0.0
         max_delay = 30.0
-        while True:
+        retries = 0
+        
+        while retries < max_retries:
             try:
                 # Semaphore timeout (5s allows for network latency + processing)
                 await asyncio.wait_for(sem.acquire(), timeout=5.0)
                 self._log_route(model_id, "acquired")
                 return
             except asyncio.TimeoutError:
+                retries += 1
+                if retries >= max_retries:
+                    logger.error(f"LeakyBucket: {model_id} exceeded max retries ({max_retries})")
+                    raise RuntimeError(f"Failed to acquire semaphore for {model_id} after {max_retries} attempts")
+                
                 delay = min(delay + 1 + random.uniform(0, 1), max_delay)
-                logger.debug(f"LeakyBucket: {model_id} waiting {delay:.1f}s")
+                logger.debug(f"LeakyBucket: {model_id} waiting {delay:.1f}s (attempt {retries}/{max_retries})")
                 await asyncio.sleep(delay)
 
     def release(self, model_id: str) -> None:

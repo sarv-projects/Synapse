@@ -15,6 +15,14 @@ async def lifespan(_app: FastAPI):
     if _rate_limiter_instance is not None:
         await _rate_limiter_instance.start()
 
+    # Schedule Groq hourly TPM reset task
+    try:
+        from api.groq_manager import schedule_hourly_reset
+        schedule_hourly_reset(_app)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to schedule Groq hourly reset: {e}")
+
     # MCP: connect all configured servers
     try:
         from mcp.client import get_mcp_manager

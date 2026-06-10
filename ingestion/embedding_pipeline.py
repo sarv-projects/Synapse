@@ -227,16 +227,27 @@ class EmbeddingPipeline:
         
         updated_count = 0
         
+        # Define dedup keys per entity type
+        DEDUP_KEYS = {
+            "Paper": "arxiv_id",
+            "Model": "hf_model_id",
+            "Tool": "github_repo",
+            "Technique": "canonical_name"
+        }
+        
         async with self.neo4j_client.session() as session:
             for item in embedding_vectors:
                 entity = item["entity"]
                 entity_id = entity["id"]
                 entity_type = entity["type"]
                 
+                # Get the correct dedup key for this entity type
+                dedup_key = DEDUP_KEYS.get(entity_type, "id")
+                
                 try:
-                    # Update the node with embedding metadata
+                    # Update the node with embedding metadata using correct dedup key
                     query = f"""
-                    MATCH (n:{entity_type} {{id: $id}})
+                    MATCH (n:{entity_type}} {{{dedup_key}: $id}})
                     SET n.embedding = $vector,
                         n.embedding_model = 'all-MiniLM-L6-v2',
                         n.embedding_dim = 384,
