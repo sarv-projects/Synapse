@@ -13,12 +13,6 @@ router = APIRouter(prefix="/api/v1")
 router.include_router(groq_status.router)
 
 
-async def _get_client():
-    """Get the shared Neo4j client singleton (connection pooled)."""
-    from ingestion.neo4j.client import get_neo4j_client
-    return await get_neo4j_client()
-
-
 @router.get("/health")
 async def health():
     """Health check endpoint — includes live Neo4j node/edge counts."""

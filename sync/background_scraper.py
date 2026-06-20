@@ -77,8 +77,17 @@ def _gate4_source_credibility(source_type: str, metrics: dict, url: str) -> bool
 
 
 async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
-    """Gate 5: pgvector semantic dedup — cosine ≥ 0.92 means duplicate."""
+    """Gate 5: pgvector semantic dedup — cosine >= 0.92 means duplicate.
+
+    Gracefully skips if pgvector is unavailable (CI missing secrets, network
+    issues, model download failure). Never crashes the whole scrape.
+    """
     try:
+        from schema.config import get_settings
+        if not get_settings().postgres_url:
+            logger.debug("Gate 5 skipped: POSTGRES_URL not configured")
+            return True
+
         from embedding.generator import get_embedding_generator
         from embedding.qdrant_client import get_qdrant_client
         gen = await get_embedding_generator()
@@ -86,9 +95,11 @@ async def _gate5_semantic_dedup(title: str, content: str, url: str) -> bool:
         store = get_qdrant_client()
         results = await store.search_similar_async(vector, limit=1, score_threshold=0.92)
         if results:
-            _log_reject("Semantic duplicate (cosine ≥ 0.92)", url, 5, {"match_url": results[0].get("payload", {}).get("name", "")})
+            _log_reject("Semantic duplicate (cosine >= 0.92)", url, 5, {"match_url": results[0].get("payload", {}).get("name", "")})
             return False
-    except (ValueError, TypeError, OSError, ConnectionError, TimeoutError) as e:
+    except Exception as e:
+        # Catch ALL exceptions — RuntimeError, ImportError, AttributeError,
+        # asyncpg connection errors, SentenceTransformer download failures, etc.
         logger.debug(f"Gate 5 pgvector dedup skipped: {e}")
     return True
 
@@ -270,21 +281,26 @@ async def run_background_scrape(dry_run: bool = False) -> dict:
                 source_type = str(item.get("source_type", "unknown"))
                 metrics = item.get("metrics", {})
 
-                if not _gate1_structural(content, url):
-                    stats["rejected"] += 1; continue
-                if not _gate2_domain_relevance(content, url):
-                    stats["rejected"] += 1; continue
-                if not _gate3_spam(title, content, url):
-                    stats["rejected"] += 1; continue
-                if not _gate4_source_credibility(source_type, metrics, url):
-                    stats["rejected"] += 1; continue
-                if not await _gate5_semantic_dedup(title, content, url):
-                    stats["rejected"] += 1; continue
+                try:
+                    if not _gate1_structural(content, url):
+                        stats["rejected"] += 1; continue
+                    if not _gate2_domain_relevance(content, url):
+                        stats["rejected"] += 1; continue
+                    if not _gate3_spam(title, content, url):
+                        stats["rejected"] += 1; continue
+                    if not _gate4_source_credibility(source_type, metrics, url):
+                        stats["rejected"] += 1; continue
+                    if not await _gate5_semantic_dedup(title, content, url):
+                        stats["rejected"] += 1; continue
 
-                stats["passed"] += 1
-                if not dry_run:
-                    await _store_in_neo4q(title, content, url, source_type)
-                    stats["stored"] += 1
+                    stats["passed"] += 1
+                    if not dry_run:
+                        await _store_in_neo4q(title, content, url, source_type)
+                        stats["stored"] += 1
+                except Exception as e:
+                    logger.error(f"Error processing item {url}: {e}", exc_info=True)
+                    stats["errors"] += 1
+                    continue
 
     logger.info(f"Background scrape complete: {stats}")
     return stats

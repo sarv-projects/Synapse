@@ -220,34 +220,57 @@ class EmbeddingPipeline:
             return None
     
     async def _update_neo4j_embeddings(self, embedding_vectors: List[Dict[str, Any]]) -> int:
-        """Update Neo4j nodes with embedding references."""
+        """Update Neo4j nodes with embedding references using correct dedup keys.
+
+        Previously this used entity["id"] (UUID) for MATCH lookups, but nodes are
+        keyed by their entity-specific dedup keys (arxiv_id, hf_model_id, etc.),
+        so MATCHes always returned 0 rows. Fixed to use the correct key value.
+        """
         if not self.neo4j_client:
             from ingestion.neo4j.client import get_neo4j_client
             self.neo4j_client = await get_neo4j_client()
-        
+
         updated_count = 0
-        
-        # Define dedup keys per entity type
+
+        # Dedup keys must match ingestion/neo4j/writer.py _DEDUP_KEY exactly
         DEDUP_KEYS = {
-            "Paper": "arxiv_id",
-            "Model": "hf_model_id",
-            "Tool": "github_repo",
-            "Technique": "canonical_name"
+            "Paper":        "arxiv_id",
+            "Model":        "hf_model_id",
+            "Tool":         "github_repo",
+            "Technique":    "canonical_name",
+            "Organization": "name",
+            "Author":       "name",
+            "Dataset":      "name",
+            "Benchmark":    "name",
+            "Space":        "name",
         }
-        
+
         async with self.neo4j_client.session() as session:
             for item in embedding_vectors:
                 entity = item["entity"]
-                entity_id = entity["id"]
                 entity_type = entity["type"]
-                
-                # Get the correct dedup key for this entity type
-                dedup_key = DEDUP_KEYS.get(entity_type, "id")
-                
+
+                dedup_key = DEDUP_KEYS.get(entity_type, "name")
+                # Use the actual dedup key value (arxiv_id, hf_model_id, etc.)
+                # NOT the UUID in entity["id"]
+                dedup_val = (
+                    entity.get(dedup_key)
+                    or entity.get("id")
+                    or entity.get("name")
+                    or entity.get("title")
+                )
+
+                if not dedup_val:
+                    logger.warning(
+                        f"No dedup key '{dedup_key}' for {entity_type} "
+                        f"(id={entity.get('id')}), skipping embedding update"
+                    )
+                    continue
+
                 try:
-                    # Update the node with embedding metadata using correct dedup key
+                    # Fixed: single { not {{  and  dedup_key/dedup_val correct
                     query = f"""
-                    MATCH (n:{entity_type}} {{{dedup_key}: $id}})
+                    MATCH (n:{entity_type} {{{dedup_key}: $dedup_val}})
                     SET n.embedding = $vector,
                         n.embedding_model = 'all-MiniLM-L6-v2',
                         n.embedding_dim = 384,
@@ -255,23 +278,25 @@ class EmbeddingPipeline:
                         n.last_seen = datetime()
                     RETURN count(n) as updated
                     """
-                    
-                    result = await session.run(
-                        query,
-                        id=entity_id,
-                        vector=item["vector"]
-                    )
-                    
+
+                    result = await session.run(query, dedup_val=str(dedup_val), vector=item["vector"])
                     record = await result.single()
                     if record and record["updated"] > 0:
                         updated_count += 1
-                    
-                    # Create EmbeddingIndex node
+                    else:
+                        logger.debug(
+                            f"No {entity_type} node with {dedup_key}={dedup_val} "
+                            f"— embedding NOT written back"
+                        )
+
                     await self._create_embedding_index_node(session, entity, item["vector"])
-                    
+
                 except Exception as e:
-                    logger.error(f"Failed to update Neo4j embedding for {entity_type} {entity_id}: {e}", exc_info=True)
-        
+                    logger.error(
+                        f"Failed to update Neo4j embedding for "
+                        f"{entity_type} {entity.get('id')}: {e}", exc_info=True
+                    )
+
         return updated_count
     
     async def _create_embedding_index_node(self, session, entity: dict, vector: list):
